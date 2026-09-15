@@ -1,0 +1,9 @@
+# Optional: not required by the currently inspected local-only upstream graph.
+# Use for an explicitly selected Clang linker/compiler or future bindgen dependencies.
+clang
+lld
+llvm
+libclang-dev
+cmake
+libelf-dev
+zlib1g-dev

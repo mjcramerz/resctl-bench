@@ -1,0 +1,17 @@
+# Unversioned names are resolved to exact newest versions from your Forky indexes.
+# Do not install Debian's rustc/cargo: use the existing rustup installation.
+build-essential
+gcc
+g++
+cpp
+make
+libc6-dev
+binutils
+ca-certificates
+git
+pkgconf
+pkgconf-bin
+python3
+libssl-dev
+curl
+xz-utils

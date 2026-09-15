@@ -1,0 +1,21 @@
+# Explicitly opt-in: apt may start services while installing these packages.
+coreutils
+util-linux
+systemd
+python3
+python3-bpfcc
+fio
+stress
+oomd
+gnuplot-nox
+btrfs-progs
+nvme-cli
+smartmontools
+# Tools needed by the optional kernel-build workload:
+build-essential
+bison
+flex
+pkgconf
+libssl-dev
+libelf-dev
+bc
