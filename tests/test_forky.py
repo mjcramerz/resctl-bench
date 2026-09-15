@@ -14,8 +14,8 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import build as bk
-import debian
-import latest
+debian = bk.debian
+latest = bk.latest
 
 POLICY = '''Package files:
  100 /var/lib/dpkg/status

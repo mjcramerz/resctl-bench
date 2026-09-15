@@ -19,13 +19,15 @@ Neither switch makes the host supported or establishes tested compatibility.
 The high-level commands are:
 
 ```sh
-make latest            # Refresh build inputs and produce the executable tarball.
+make package           # One command: setup, current inputs, compile and binary tarball.
+make                   # Same as make package.
+make latest            # Compatibility alias for make package.
 make latest-complete   # Also vendor and produce the populated source tarball.
-make package           # Rebuild/package selected inputs; no input updates.
+make rebuild           # Rebuild/package selected inputs; no input updates.
 make verify            # Check the last runtime archive and staged payload.
 ```
 
-`latest` requires online operation, `UPSTREAM_REF=main`, and
+`package` (unless OFFLINE=1), `latest`, and `latest-complete` require online operation, `UPSTREAM_REF=main`, and
 `TOOLCHAIN=nightly`. `UPSTREAM_URL` defaults to the official repository. A
 custom URL is a trusted-input choice, not a claim that it is official upstream.
 `UPSTREAM_REF` controls only first fetch and explicit `update-source`; after
@@ -36,7 +38,7 @@ and installs the exact official nightly, refreshes compatible crates, runs
 compiler/linker probes, and builds/packages. `latest-complete` then vendors and
 creates the source distribution. The workflow is NOT a transactional rollback
 of all APT/rustup/Git side effects. Successful updates can remain after a later
-compile failure. Each package attempt clears the prior runtime success pointer;
+compile failure. Each package attempt clears the prior runtime success pointer and latest alias;
 only successful runtime publication creates a new one. A later source-archiving
 failure does not delete an already successful runtime package. Old artifacts
 are never silently presented as outputs of a failed new package attempt.
@@ -64,6 +66,10 @@ held-package bypass, or distribution upgrade flags are added.
 `make deps-plan` only simulates with the CURRENT indexes; it does not claim
 freshness or run `apt-get update`. Actual install plans, logs and verified
 versions are recorded under `.work/apt-*.json` and `.work/logs/`.
+
+For an unprivileged user, `sudo -v` authenticates with an inherited terminal
+before APT output is captured. Subsequent APT commands use `sudo -n`, so a
+password prompt cannot disappear into the log pipe. Only APT receives sudo.
 
 The default compiler drivers are `/usr/bin/gcc` and `/usr/bin/g++`, avoiding
 unreviewed alternatives such as a custom `cc` wrapper. `pkgconf`/`pkgconf-bin`
@@ -93,15 +99,28 @@ The dated selection lives in `toolchain-selection.json`; it overrides this
 kit's `TOOLCHAIN=nightly`, not your global rustup default or existing nightly
 alias. Explicitly selected other installed toolchains are not overridden by
 that file. `make lock-toolchain` deliberately accepts an installed compiler
-identity for normal builds; it cannot make a stale compiler satisfy an existing
+identity for locked rebuilds; it cannot make a stale compiler satisfy an existing
 latest-nightly selection. `make update-rustup` separately calls the existing
 manager's self-update; a manager built without self-update must be maintained
-through its distributor. Normal build/package targets never install Rust.
+through its distributor. Online `make package` can install the selected dated
+nightly through the existing rustup; it does not install or self-update rustup.
 
 The resolver fails rather than guessing when it cannot retrieve or parse the
 official manifest, a minimal component is missing, or identities do not match.
 This authoring environment could not execute the live manifest/rustup path;
 see VALIDATION.md. Accurate system time and normal HTTPS trust are required.
+
+### Entrypoint and existing rustup discovery
+
+The Makefile uses `/usr/bin/python3 -I -B`. Bundled `debian.py` and `latest.py`
+are loaded by their paths next to `build.py`, under private module names.
+Neither PYTHONPATH nor script-directory insertion is required. An incomplete
+extraction reports the missing file explicitly; these are not pip dependencies.
+Isolated mode is also used for the install/verify subprocesses.
+
+The driver finds rustup in the existing PATH, `$CARGO_HOME/bin`, or
+`$HOME/.cargo/bin`, in that order, without changing the user's shell. The kit
+must be run by the user who owns that installation. `config.mk` is optional.
 
 ### Dependency overlay and Git provenance
 
@@ -176,9 +195,9 @@ output. Default binaries are resctl-bench, rd-agent, rd-hashd, resctl-demo.
 | update-toolchain / update-rustup / lock-toolchain | Resolve latest nightly / update manager / accept installed compiler. |
 | update-deps / fetch-deps | Refresh compatible dependency overlay / fetch locked dependencies. |
 | versions / doctor | Print provenance / probe compiler and linker. |
-| latest / latest-complete | Refresh inputs and make runtime / runtime plus populated source distributions. |
+| package / latest / latest-complete | Refresh inputs and make runtime / runtime plus populated source distributions. |
 | build / check / test-compile | Release binary build / check / compile tests without running. |
-| smoke / stage / package / verify | CLI checks / stage payload / tar+checksum / verify latest result. |
+| smoke / stage / rebuild / verify | CLI checks / stage payload / package selected inputs / verify latest result. |
 | vendor / source-dist / kit-dist | Vendor locked crates / populated source archive / build-kit-only archive. |
 | lint / test | Syntax/whitespace checks / orchestration fixture tests. |
 | runtime-check | Read-only inventory, optional SCRATCH existing directory. |
@@ -233,6 +252,13 @@ rejects symlink traversal, records an installation manifest and never runs
 services, ldconfig, or benchmarks. Keep the prefix protected from untrusted
 concurrent writers. Uninstall refuses modified tracked files rather than
 deleting local changes or unrelated files.
+
+The convenience path `dist/resctl-bench-latest.tar.gz` is a relative symlink to
+the successfully generated versioned binary tarball. Its matching `.sha256`
+uses the convenience filename. It is published only after successful staging
+and packaging, and cleared at the beginning of the next attempt. Tarballs with different build IDs remain available; rebuilding the same ID
+replaces its archive. A source-vendoring
+failure after binary packaging does not invalidate that successful binary archive.
 
 ## Failure handling
 

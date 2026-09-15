@@ -22,6 +22,15 @@ jobs:
         with:
           persist-credentials: false
       - run: make lint test
+      - name: Validate the actual distributed entrypoints after extraction
+        shell: bash
+        run: |
+          make kit-dist
+          mkdir /tmp/kit-release-check
+          tar -xzf dist/resctl-bench-buildkit-2.1.0.tar.gz -C /tmp/kit-release-check
+          cd /tmp/kit-release-check/resctl-bench-buildkit-2.1.0
+          sha256sum -c SHA256SUMS
+          PYTHONSAFEPATH=1 make help lint test
   real-upstream:
     if: github.event_name == 'workflow_dispatch' && inputs.upstream_build
     runs-on: ubuntu-latest

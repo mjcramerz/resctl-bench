@@ -21,7 +21,7 @@ class LatestError(RuntimeError):
 
 
 def download_manifest() -> bytes:
-    request = urllib.request.Request(MANIFEST_URL, headers={'User-Agent': 'resctl-bench-buildkit/2.0.0'})
+    request = urllib.request.Request(MANIFEST_URL, headers={'User-Agent': 'resctl-bench-buildkit/2.1.0'})
     try:
         with urllib.request.urlopen(request, timeout=45) as response:
             if response.geturl().split('://', 1)[0] != 'https':

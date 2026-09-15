@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 import fcntl
 import gzip
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -30,19 +31,45 @@ import tomllib
 from urllib.parse import urlsplit
 from typing import Any, Iterator, Mapping, Sequence
 
-import debian
-import latest
+# Do not rely on sys.path containing scripts/: -P, -I, PYTHONSAFEPATH,
+# Python wrappers and third-party packages named "debian" can break that.
+# Load only the two bundled helpers from this driver's own directory.
+def _load_helper(name: str) -> Any:
+    path = Path(__file__).resolve().parent / (name + ".py")
+    if not path.is_file():
+        raise SystemExit(
+            f"ERROR: Incomplete build kit: missing {path}. "
+            "Re-extract the complete build-kit archive; do not pip-install this module."
+        )
+    module_name = "_resctl_buildkit_" + name
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"ERROR: Cannot load bundled helper {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(module_name, None)
+        raise
+    return module
 
-VERSION = "2.0.0"
+
+debian = _load_helper("debian")
+latest = _load_helper("latest")
+
+VERSION = "2.1.0"
 ROOT = Path(__file__).resolve().parents[1]
 GIB = 1024**3
 BASE_BINS = ("resctl-bench", "rd-agent", "rd-hashd")
 KIT_ITEMS = ("Makefile", "README.md", "LICENSE", "NOTICE.md", ".gitignore",
              ".editorconfig", "config.mk.example", "scripts", "tests", "docs",
              "packages", ".github", "CHANGELOG.md")
-HELP = """resctl-bench-buildkit 2.0.0 (Debian Forky, native amd64/arm64 GNU/Linux)
+HELP = """resctl-bench-buildkit 2.1.0 (Debian Forky, native amd64/arm64 GNU/Linux)
 
-  make latest           Forky build deps + latest main/nightly/compatible crates + release
+  make                  Same as make package (one-command online build)
+  make package          Forky deps + latest main/nightly/compatible crates + binary tarball
+  make latest           Compatibility alias for make package
   make latest-complete  Same, plus populated source tarball with vendored crates
   make deps             Install newest declared build packages from Forky (sudo for APT)
   make deps-plan        Simulate the Forky dependency transaction using current indexes
@@ -62,7 +89,7 @@ HELP = """resctl-bench-buildkit 2.0.0 (Debian Forky, native amd64/arm64 GNU/Linu
   make test-compile     Compile upstream tests; DO NOT execute them
   make smoke            Build; run only each binary's --version and --help
   make stage            Build, stage, split debug symbols, verify, smoke test
-  make package          Stage and create dist/*.tar.gz plus SHA256 checksum
+  make rebuild          Package the already selected source/toolchain/dependencies
   make all              Same as package
   make verify           Verify hashes of the most recently packaged release
   make vendor           Vendor the entire locked Cargo dependency graph
@@ -79,6 +106,7 @@ HELP = """resctl-bench-buildkit 2.0.0 (Debian Forky, native amd64/arm64 GNU/Linu
 Configuration: config.mk.example or make VAR=value.
   TOOLCHAIN=nightly TUNE=native|portable LTO=thin|fat|off JOBS=auto|N
   WITH_DEMO=1 SPLIT_DEBUG=1 OFFLINE=0 HOST_CC=/usr/bin/gcc HOST_CXX=/usr/bin/g++
+  OFFLINE=1 skips updates and packages the already provisioned, locked build
   PREFIX=/usr/local DESTDIR= FORCE=0
   UPSTREAM_URL=https://github.com/facebookexperimental/resctl-demo.git
   UPSTREAM_REF=main (only initial fetch/update; then the full SHA is locked)
@@ -206,11 +234,19 @@ def checksums(tree: Path) -> None:
 
 def run(argv: Sequence[str | Path], *, cwd: Path | None = None,
         env: Mapping[str, str] | None = None, timeout: int | None = None,
-        log: Path | None = None, quiet: bool = False) -> str:
+        log: Path | None = None, quiet: bool = False, interactive: bool = False) -> str:
     args = [str(a) for a in argv]
     if not quiet:
         print("+ " + shlex.join(args), file=sys.stderr, flush=True)
     try:
+        if interactive:
+            if log is not None:
+                raise BuildError("Interactive commands cannot capture a log")
+            # Inherit the terminal so sudo's no-newline password prompt is visible.
+            proc = subprocess.run(args, cwd=cwd, env=env, timeout=timeout, check=False)
+            if proc.returncode:
+                raise BuildError(f"Command failed ({proc.returncode}): {shlex.join(args)}")
+            return ""
         if log is None:
             proc = subprocess.run(args, cwd=cwd, env=env, text=True,
                                   capture_output=True, timeout=timeout, check=False)
@@ -344,6 +380,24 @@ def compilation_flags(cfg: Config, host: str, root: Path, cargo_home: Path) -> t
     return rust + list(cfg.extra_rust), cflags + list(cfg.extra_c), cflags + list(cfg.extra_cxx)
 
 
+def rustup_environment(environment: Mapping[str, str]) -> dict[str, str]:
+    """Find the existing rustup, including installs not exported in the shell PATH."""
+    env = dict(environment)
+    path = env.get("PATH", os.defpath)
+    if shutil.which("rustup", path=path):
+        return env
+    homes = []
+    if env.get("CARGO_HOME"):
+        homes.append(Path(env["CARGO_HOME"]).expanduser())
+    homes.append(Path(env.get("HOME", str(Path.home()))) / ".cargo")
+    for home in homes:
+        binary = home / "bin" / "rustup"
+        if binary.is_file() and os.access(binary, os.X_OK):
+            env["PATH"] = str(binary.parent.resolve()) + os.pathsep + path
+            return env
+    return env
+
+
 class Builder:
     def __init__(self, root: Path, cfg: Config):
         self.root, self.cfg = root.resolve(), cfg
@@ -359,7 +413,7 @@ class Builder:
         return latest.selected_toolchain(self.root, self.cfg.toolchain)
 
     def environment(self) -> dict[str, str]:
-        env = dict(os.environ)
+        env = rustup_environment(os.environ)
         for key in list(env):
             if key.startswith("VERGEN_") or key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"):
                 env.pop(key, None)
@@ -454,7 +508,8 @@ class Builder:
         debian.require_forky()
         self.reject_shadow_configuration()
         required = ("rustup", "git", "pkg-config", "readelf", "objcopy", "strip", self.cfg.cc, self.cfg.cxx)
-        missing = [name for name in required if not shutil.which(name)]
+        tool_env = self.environment()
+        missing = [name for name in required if not shutil.which(name, path=tool_env.get("PATH"))]
         if missing:
             raise BuildError("Missing tools: " + ", ".join(missing) + ". Use make deps; Rust must already be installed with rustup.")
         for key, value in os.environ.items():
@@ -644,9 +699,12 @@ class Builder:
     def newest(self, complete: bool = False) -> None:
         self.assert_build_user()
         debian.require_forky(allow_override=False)
+        if not shutil.which("rustup", path=self.environment().get("PATH")):
+            raise BuildError("Existing rustup not found in PATH, $CARGO_HOME/bin, or $HOME/.cargo/bin. "
+                             "Run as the user who owns your rustup installation.")
         if self.cfg.offline or self.cfg.ref != "main" or self.cfg.toolchain != "nightly":
             raise BuildError("latest requires online UPSTREAM_REF=main TOOLCHAIN=nightly")
-        (self.work / "last-package.json").unlink(missing_ok=True)
+        self.invalidate_package()
         (self.root / "latest-resolution.json").unlink(missing_ok=True)
         if self.src.exists():
             self.verify_source()  # Reject edits before changing system packages or tools.
@@ -927,20 +985,37 @@ class Builder:
                 (stage / p).chmod(0o755)
             shutil.copyfile(self.root / "docs/RELEASE-README.md", stage / "README.md")
             checksums(stage)
-            run([sys.executable, stage / "install.py", "--package", stage, "--verify"], quiet=True)
+            run([sys.executable, "-I", "-B", stage / "install.py", "--package", stage, "--verify"], quiet=True)
             if final.exists():
                 shutil.rmtree(final)
             stage.rename(final)
         write_json(self.work / "last-stage.json", {"path": str(final), "settings": settings})
         return final, settings
 
-    def package(self) -> Path:
+    def invalidate_package(self) -> None:
+        """Never leave a convenience success pointer for an unsuccessful attempt."""
         (self.work / "last-package.json").unlink(missing_ok=True)
+        alias = self.dist / "resctl-bench-latest.tar.gz"
+        if alias.is_symlink():
+            alias.unlink()
+        elif alias.exists():
+            raise BuildError(f"Refuse to overwrite non-generated archive alias: {alias}")
+        (self.dist / "resctl-bench-latest.tar.gz.sha256").unlink(missing_ok=True)
+
+    def package(self) -> Path:
+        self.invalidate_package()
         stage, settings = self.stage()
         tar = self.dist / (stage.name + ".tar.gz")
         make_archive(stage, tar, settings["source_date_epoch"])
+        alias = self.dist / "resctl-bench-latest.tar.gz"
+        pending = self.dist / ".resctl-bench-latest.tar.gz.tmp"
+        pending.unlink(missing_ok=True)
+        pending.symlink_to(tar.name)
+        os.replace(pending, alias)
+        atomic_write(self.dist / "resctl-bench-latest.tar.gz.sha256",
+                     f"{digest(tar)}  {alias.name}\n".encode())
         write_json(self.work / "last-package.json", {"path": str(tar), "sha256": digest(tar), "stage": str(stage)})
-        print(f"Created {tar}\nSHA256 {digest(tar)}")
+        print(f"\nCreated {tar}\nSHA256 {digest(tar)}\nBinary tarball: {alias}", flush=True)
         return tar
 
     def vendor(self) -> None:
@@ -977,6 +1052,12 @@ class Builder:
                 shutil.copyfile(src, dest)
         for p in (destination / "scripts").glob("*.py"):
             p.chmod(0o755)
+        # Archive completeness gate: isolated Python ignores PYTHONPATH and the
+        # scripts directory, precisely the environment the old imports broke in.
+        for action in ("help", "lint"):
+            run([sys.executable, "-I", "-B", destination / "scripts/build.py", action],
+                cwd=destination, timeout=30, quiet=True)
+        (destination / ".buildkit.lock").unlink(missing_ok=True)
 
     def source_dist(self, kit_only: bool = False) -> Path:
         lock = None
@@ -1017,7 +1098,7 @@ class Builder:
         return destination
 
     def install(self, uninstall: bool = False) -> None:
-        cmd: list[str | Path] = [sys.executable, self.root / "scripts/install.py",
+        cmd: list[str | Path] = [sys.executable, "-I", "-B", self.root / "scripts/install.py",
                                 "--prefix", os.environ.get("PREFIX", "/usr/local")]
         if os.environ.get("DESTDIR"):
             cmd += ["--destdir", os.environ["DESTDIR"]]
@@ -1092,7 +1173,8 @@ def main() -> int:
             builder.assert_build_user()
             if cfg.offline:
                 raise BuildError("update-rustup requires online operation")
-            run(["rustup", "self", "update"], log=builder.work / "logs/rustup-self-update.log")
+            run(["rustup", "self", "update"], env=builder.environment(),
+                log=builder.work / "logs/rustup-self-update.log")
         elif action == "update-deps":
             builder.update_dependencies()
         elif action == "versions":
@@ -1118,6 +1200,11 @@ def main() -> int:
             stage, _ = builder.stage()
             print(stage)
         elif action == "package":
+            if cfg.offline:
+                builder.package()
+            else:
+                builder.newest()
+        elif action == "rebuild":
             builder.package()
         elif action == "vendor":
             builder.vendor()
@@ -1128,7 +1215,7 @@ def main() -> int:
             path = Path(last["path"])
             if not path.resolve().is_relative_to(builder.dist.resolve()) or digest(path) != last["sha256"]:
                 raise BuildError("Release archive checksum/path mismatch")
-            run([sys.executable, ROOT / "scripts/install.py", "--package", last["stage"], "--verify"])
+            run([sys.executable, "-I", "-B", ROOT / "scripts/install.py", "--package", last["stage"], "--verify"])
             print("Archive and staged files verified")
         elif action == "clean":
             if builder.work.is_symlink():

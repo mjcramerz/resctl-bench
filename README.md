@@ -1,150 +1,117 @@
-# resctl-bench build kit 2.0.0 - Debian Forky
+# resctl-bench build kit 2.1.0 - Debian Forky
 
-A native, source-based build and release pipeline for Facebook Experimental's
-`resctl-demo` workspace. This edition targets **Debian Forky (testing), amd64
-or arm64, GNU/Linux**, and the Rust toolchains managed by your existing rustup.
-It builds `resctl-bench`, `rd-agent`, `rd-hashd`, and, by default, `resctl-demo`.
+## Build and get the binary tarball
 
-## What this download contains
-
-The `resctl-bench-buildkit-2.0.0.tar.gz` download is the complete **build-kit
-implementation**, including Makefile, Python build driver, Forky APT resolver,
-nightly resolver, installer, read-only runtime checks, regression tests, CI,
-and documentation. It contains **no upstream Rust checkout, vendored crates,
-or precompiled resctl executables**. No placeholder executable is presented as
-resctl-bench. On a networked Forky host, `make latest-complete` creates both the
-real executable release tarball and the populated upstream-plus-vendor source
-tarball. See [validation boundaries](docs/VALIDATION.md).
-
-## Start here on Forky
-
-Run as the ordinary user who owns your rustup installation, not under sudo.
-APT operations alone request sudo. No target changes your APT sources, performs
-a distribution upgrade, selects an NVMe device, or starts a benchmark.
+From the extracted directory, run as your ordinary rustup-owning user:
 
 ```sh
-sha256sum -c resctl-bench-buildkit-2.0.0.tar.gz.sha256
-tar -xzf resctl-bench-buildkit-2.0.0.tar.gz
-cd resctl-bench-buildkit-2.0.0
-export PATH="$HOME/.cargo/bin:$PATH"
-
-# Explicitly update the existing rustup manager itself; do not reinstall it.
-make update-rustup
-
-# Refresh Forky build dependencies, upstream main, the latest published nightly,
-# and compatible crate versions; compile, smoke-test, package, and vendor.
-make latest-complete
-make verify
-make versions
+make package
 ```
 
-GNU Make and Python 3.11+ are entrypoint prerequisites. On a minimal Forky
-installation only, bootstrap them with `sudo apt-get update --error-on=any`
-and `sudo apt-get install --no-install-recommends make python3 ca-certificates git`.
-There are no Python packages to install with pip. `make test` additionally needs
-Git, GCC, G++, binutils and pkg-config; `make deps` installs the build tools.
-A distribution-managed rustup built without self-update may reject
-`make update-rustup`; update that package through its owner rather than
-installing a second Rust distribution over it.
-
-## What "latest" means here
-
-`make latest` / `make latest-complete` explicitly resolve moving inputs:
-
-| Input | Policy |
-| --- | --- |
-| Upstream | Fetch the current `main` and record the full real Git commit. |
-| Rust | Read Rust's current official nightly manifest; require the host's minimal components; install the exact dated nightly; verify the compiler commit and release. No older-nightly fallback. |
-| Crates | Run `cargo update` in a separate source copy, respecting upstream manifest constraints and Cargo's resolver. Preserve the original upstream `Cargo.lock` and record the effective lock plus its diff. |
-| Debian build packages | Refresh APT indexes and select the newest available versions in configured Debian-origin, `n=forky` indexes. Expand compiler metapackages to their current implementations without hardcoding GCC/LLVM major versions. |
-| Subsequent builds | Use the resolved locks. `make package` does not silently advance source, toolchain, or dependencies. Run `make latest-complete` again to refresh them. |
-
-These are **latest inputs at their recorded resolution times**, not a promise
-that no publisher releases a new version during a long build. Package indexes
-can lag upstream releases. A manifest requiring an older crate major version is
-not rewritten: automatically forcing breaking dependency upgrades is a source
-migration, not a reliable build flag. There is no hidden fallback to an older
-nightly, upstream tag, Sid package, unlocked build, or permissive removal plan
-when the current combination fails.
-
-Only declared build dependencies and their resolved transaction are installed;
-this is not a whole-system updater. Kernel, NVMe firmware, runtime packages,
-and the rustup manager have separate lifecycles. `make deps-runtime` and
-`make update-rustup` are explicit commands, not side effects of `make package`.
-
-## Outputs
-
-After `make latest-complete` succeeds:
+That is the complete online workflow. It installs the declared Debian Forky
+build dependencies (sudo prompts when necessary), fetches current upstream
+`main`, selects the newest published nightly through your existing rustup,
+resolves current compatible Cargo dependencies, compiles with native-host
+release settings, checks and packages the executables, and prints the result:
 
 ```text
-dist/
-  resctl-bench-<version>-<host>-<tuning>-<build-id>.tar.gz
-  resctl-bench-<version>-<host>-<tuning>-<build-id>.tar.gz.sha256
-  resctl-bench-buildkit-2.0.0-source-<commit>-<identity>.tar.gz
-  resctl-bench-buildkit-2.0.0-source-<commit>-<identity>.tar.gz.sha256
+dist/resctl-bench-latest.tar.gz
+dist/resctl-bench-latest.tar.gz.sha256
 ```
 
-The runtime tarball includes the programs, split debug symbols, upstream and
-third-party licenses available in dependency sources, dependency inventory,
-real Git/compiler/package/CPU provenance, original and effective Cargo locks,
-update evidence, build logs, ELF inspection and CLI smoke results, checksums,
-a standalone installer, and read-only runtime checker. It does not bundle
-glibc, Python, fio, BCC, or other Debian runtime libraries/tools.
+`resctl-bench-latest.tar.gz` points to the versioned runtime tarball in the same
+`dist/` directory. The tarball contains `bin/resctl-bench`, `bin/rd-agent`,
+`bin/rd-hashd`, and `bin/resctl-demo`, separate debug symbols, documentation,
+licenses, checksums, and recorded source/compiler/dependency/build information.
+It is not a source-only archive. It does not include Debian shared libraries.
 
-The populated source tarball includes this kit, pristine upstream with its
-real Git identity, source/compiler/dependency locks, and vendored Cargo source
-dependencies. It does not contain a Rust compiler, Debian packages, firmware,
-or build outputs. With the matching toolchain and native prerequisites already
-installed, extract it elsewhere and run `make package OFFLINE=1`. Cargo uses
-`--frozen` and relocated vendor configuration; this is not an OS-level network
-sandbox for arbitrary upstream build scripts.
+Plain `make` does the same thing. No config file edits, PATH export, Python
+virtual environment, pip installation, or separate preparation targets are
+needed for the default workflow. Do not run `sudo make package`; elevation is
+used only for APT. Network access, working Debian Forky APT repositories, GNU
+Make, system Python 3.11+, an existing rustup installation, and permission to
+install dependencies via sudo are prerequisites.
 
-## Host tuning and configuration
+The driver finds rustup in PATH, `$CARGO_HOME/bin`, or `$HOME/.cargo/bin`.
+It does not reinstall rustup or change your global Rust default. It can install
+a new dated nightly using that manager. Builds run as your ordinary user.
 
-The defaults are release `opt-level=3`, thin LTO, one codegen unit, no
-incremental compilation, panic unwinding, frame pointers, full RELRO, and
-separate debug symbols. Rust uses `-Ctarget-cpu=native`; C/C++ use native
-x86-64 or AArch64 flags as appropriate, with stack protection and fortification.
-No guessed CPU model, fast-math, unstable `build-std`, or cross-language LLVM
-LTO is forced. These are explicit defaults, not a measured optimum for all jobs.
+## What was fixed
+
+The 2.0.0 driver used fragile top-level imports of `latest` and `debian`.
+Those imports assumed Python would put the scripts directory on its import
+path, and could collide with an installed `debian` package. The helpers are
+now loaded from their explicit bundled locations under private names.
+The Makefile uses isolated system Python, as do installation/verification
+subprocesses. Missing helper files report an incomplete extraction rather
+than suggesting a pip dependency. Safe-path mode no longer breaks startup.
+
+`make package` now includes setup, instead of assuming the user already ran
+other targets. Sudo authentication is visible on the terminal before APT output
+is logged. Distribution trees and actual extracted Makefile entrypoints are
+covered by regression tests, including directories containing spaces.
+
+## Download and build
 
 ```sh
-make latest-complete JOBS=4   # Bound compiler concurrency.
-make latest-complete TUNE=portable   # No native CPU tuning; not a static build.
-make package WITH_DEMO=0     # Keep benchmark plus required agent/hashd helpers.
-make package LTO=off         # Diagnostic alternative to thin LTO.
-cp config.mk.example config.mk   # Optional persistent configuration.
+tar -xzf resctl-bench-buildkit-2.1.0.tar.gz
+cd resctl-bench-buildkit-2.1.0
+make package
 ```
 
-A native artifact is intended for the build machine or verified compatible
-hardware. `TUNE=portable` does not remove glibc/libstdc++/OpenSSL dependencies
-or guarantee compatibility with older Debian systems. Keep the upstream
-benchmark version, input files, CPU policy, and storage environment consistent
-when comparing benchmark results; changing the build can change the workload.
+This downloadable archive contains the complete build-kit implementation,
+not a precompiled resctl executable or an upstream source checkout. The command
+above downloads upstream and generates the binary tarball on your Forky host.
+No fixture or placeholder executable is shipped as a resctl program.
 
-## Install and diagnose separately
+## Inputs, repeat builds, and optional source archive
 
-```sh
-sudo make install PREFIX=/usr/local   # Installs last successful package; no build.
-sudo make uninstall PREFIX=/usr/local # Removes only unchanged tracked payloads.
+The online `make package` command refreshes upstream main, the dated nightly,
+compatible crate versions, and declared Forky build packages every time.
+Exact inputs are recorded. Dependency updates respect upstream manifests;
+this is not a forced migration to incompatible crate major versions. Failed
+compilation is not retried with older sources or an unlocked dependency graph.
 
-# Explicit APT installation: distro package maintainer scripts may start services.
-make deps-runtime
-# Inspect only an existing filesystem directory, never a raw device node.
-make runtime-check SCRATCH=/existing/benchmark/filesystem
-```
+`make rebuild` rebuilds the already selected inputs without refreshing them.
+`make latest` remains an alias for the online package workflow.
+`make latest-complete` additionally creates a populated upstream-plus-vendored-
+dependencies source tarball. Neither source vendoring nor this extra archive
+is necessary to obtain the binary tarball with `make package`.
 
-There is no `make benchmark` target. Read [runtime preparation](docs/RUNTIME.md)
-before invoking upstream manually on a dedicated, disposable benchmark host.
+A populated source archive can be rebuilt with `make package OFFLINE=1` after
+extracting it on a host with the matching compiler and Debian dependencies
+already installed. Cargo then uses --frozen and local vendor sources. This is
+not a network sandbox for upstream build scripts.
 
-## Development and further documentation
+## Host optimization and safety
 
-`make lint test` checks this build kit using synthetic Rust/Cargo fixtures,
-real local Git and GCC-produced ELF programs. It does not certify that an
-arbitrary current upstream/nightly combination compiles. `make check` compiles
-upstream checks and `make test-compile` compiles upstream tests without executing
-them. An opt-in CI job runs a real online build and relocated offline rebuild.
+Defaults are native amd64/arm64 GNU/Linux code generation, release opt-level 3,
+thin LTO, one codegen unit, frame pointers, panic unwinding, full RELRO, and
+separate debug information. Rust uses `-Ctarget-cpu=native`; C/C++ use
+`-march=native -mtune=native` on amd64 and `-mcpu=native` on arm64. Native
+artifacts must be used on compatible CPUs. `TUNE=portable` removes native CPU
+selection, not dependencies on the host's Debian shared-library ABI.
 
-See [build design and all targets](docs/BUILD.md),
-[validation evidence](docs/VALIDATION.md),
-[primary sources](docs/SOURCES.md), and [changes](CHANGELOG.md).
+Optional reviewed overrides such as `JOBS=4`, `WITH_DEMO=0`, or `LTO=off` are
+accepted on the command line. `config.mk.example` documents the defaults;
+copying it is not a prerequisite. Unexpected ambient compiler flags and Cargo
+configuration are rejected rather than silently changing the recorded build.
+
+No build target launches a benchmark, starts rd-agent, selects or formats an
+NVMe device, writes IOCost/CPU/kernel settings, or installs a kernel/firmware.
+Runtime preparation and installation are separate. A successful compile is
+not a claim that storage benchmarking is safe on the host.
+
+## Validation
+
+The 2.1.0 regression suite passes **86 tests**. It includes actual Makefile
+subprocesses, independent archive extraction, local Git, real GCC-produced
+ELF files, debug splitting, checksums, packaging, installation and removal.
+External Rust/Cargo, nightly and APT services are simulated in the pipeline
+tests. This authoring sandbox has no Rust toolchain and cannot resolve GitHub
+for a source download, so a real upstream/nightly compilation was not executed
+here. No precompiled upstream binaries are included in this download.
+
+See [validation details](docs/VALIDATION.md), [build design](docs/BUILD.md),
+[runtime precautions](docs/RUNTIME.md), [primary sources](docs/SOURCES.md),
+and [changes](CHANGELOG.md). `make help` lists the advanced targets.

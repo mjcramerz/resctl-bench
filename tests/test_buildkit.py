@@ -121,7 +121,7 @@ if name == 'rustdoc':
     print('rustdoc fixture'); sys.exit(0)
 if name == 'rustc':
     if '-vV' in args:
-        print('rustc 1.95.0-nightly (fixture)\nbinary: rustc\ncommit-hash: fixture\ncommit-date: 2026-01-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0-nightly\nLLVM version: 21.0.0')
+        print('rustc 1.95.0-nightly (fixture)\nbinary: rustc\ncommit-hash: ffffffffffffffffffffffffffffffffffffffff\ncommit-date: 2026-01-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0-nightly\nLLVM version: 21.0.0')
     elif '--print' in args:
         print('target_arch="x86_64"\ntarget_feature="sse2"')
     elif '-o' in args:
@@ -231,7 +231,7 @@ class PipelineTests(unittest.TestCase):
         fakebin = base / "fakebin"
         fakebin.mkdir()
         for tool in ("cargo", "rustc", "rustdoc", "rustup"):
-            (fakebin / tool).write_text(FAKE_TOOL)
+            (fakebin / tool).write_text(FAKE_TOOL.replace("#!/usr/bin/env python3", "#!" + sys.executable))
             (fakebin / tool).chmod(0o755)
         self.log = base / "commands.jsonl"
         self.log.touch()
@@ -462,6 +462,8 @@ class PipelineTests(unittest.TestCase):
         with patch.dict(os.environ, {"FIXTURE_FAIL": "1"}), self.assertRaises(bk.BuildError):
             self.builder.package()
         self.assertFalse((self.builder.work / "last-package.json").exists())
+        self.assertFalse((self.builder.dist / "resctl-bench-latest.tar.gz").exists())
+        self.assertFalse((self.builder.dist / "resctl-bench-latest.tar.gz.sha256").exists())
 
     def test_shadow_cargo_config_rejected(self):
         (self.root / ".cargo").mkdir()
@@ -485,6 +487,80 @@ class PipelineTests(unittest.TestCase):
         builder = bk.Builder(self.root, dataclasses.replace(self.cfg, offline=True))
         with self.assertRaises(bk.BuildError):
             builder.update_dependencies()
+
+
+    def test_extracted_archive_make_package_entrypoint_offline(self):
+        """Real Makefile + Python subprocess + real ELF/archive; Cargo is a fixture."""
+        archive = self.builder.source_dist()
+        unpack = Path(self.temp.name) / "fresh extraction with spaces"
+        unpack.mkdir()
+        with tarfile.open(archive) as tar:
+            tar.extractall(unpack, filter="data")
+        kit = next(unpack.iterdir())
+        env = dict(os.environ, PYTHONSAFEPATH="1", UPSTREAM_URL=str(self.remote))
+        result = subprocess.run(
+            ["make", "--no-print-directory", "-C", str(kit), "package", "verify", "OFFLINE=1"],
+            env=env, text=True, capture_output=True, timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        alias = kit / "dist/resctl-bench-latest.tar.gz"
+        self.assertTrue(alias.is_file())
+        self.assertTrue(alias.is_symlink())
+        with tarfile.open(alias) as tar:
+            names = tar.getnames()
+            for binary in self.cfg.binaries:
+                self.assertTrue(any(name.endswith("/bin/" + binary) for name in names))
+        checksum = alias.with_name(alias.name + ".sha256").read_text().split()[0]
+        self.assertEqual(checksum, bk.digest(alias))
+
+
+    def test_online_make_package_orchestrates_setup_build_and_tarball(self):
+        """Use actual Make/main/newest; substitute only external APT/nightly services.
+
+        Cargo remains the explicitly synthetic compiler fixture used by this suite.
+        This is not a real Forky or upstream compiler compatibility test.
+        """
+        launcher = Path(self.temp.name) / "online_fixture.py"
+        launcher.write_text(r'''import importlib.util, pathlib, sys
+path = pathlib.Path(sys.argv[1]).resolve()
+spec = importlib.util.spec_from_file_location("fixture_driver", path)
+driver = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = driver
+spec.loader.exec_module(driver)
+driver.debian.require_forky = lambda **kwargs: {"ID": "debian", "VERSION_CODENAME": "forky"}
+def apt(root, group, run, write_json, **kwargs):
+    plan = {"schema": 1, "fixture": True, "group": group, "packages": []}
+    write_json(root / ".work" / ("apt-" + group + ".json"), plan)
+    return plan
+driver.debian.install_dependencies = apt
+def nightly(self):
+    selection = {"schema": 1, "requested_toolchain": "nightly",
+                 "resolved_toolchain": "nightly-2026-01-02", "fixture": True,
+                 "host": "x86_64-unknown-linux-gnu", "rustc_commit": "f" * 40,
+                 "rustc_version": "1.95.0-nightly (synthetic)"}
+    driver.write_json(self.root / "toolchain-selection.json", selection)
+    self.tools(refresh=True)
+driver.Builder.update_toolchain = nightly
+sys.argv = sys.argv[1:]
+sys.exit(driver.main())
+''')
+        env = dict(os.environ, UPSTREAM_URL=str(self.remote), PYTHONSAFEPATH="1")
+        result = subprocess.run(
+            ["make", "--no-print-directory", "-C", str(self.root), "package",
+             "PYTHON=" + sys.executable + " -I " + str(launcher), "PYTHON_FLAGS="],
+            env=env, text=True, capture_output=True, timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Binary tarball:", result.stdout)
+        alias = self.root / "dist/resctl-bench-latest.tar.gz"
+        self.assertTrue(alias.is_file())
+        commands = [row["command"] for row in self.calls()]
+        self.assertLess(commands.index("update"), commands.index("build"))
+        self.assertTrue((self.root / "dependency-lock/Cargo.lock.diff").is_file())
+        with tarfile.open(alias) as tar:
+            names = tar.getnames()
+            for binary in self.cfg.binaries:
+                self.assertTrue(any(name.endswith("/bin/" + binary) for name in names))
 
 
 if __name__ == "__main__":

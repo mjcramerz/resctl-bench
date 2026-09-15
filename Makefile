@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: MIT
-.DEFAULT_GOAL := help
+.DEFAULT_GOAL := package
 .DELETE_ON_ERROR:
 .NOTPARALLEL:
-PYTHON ?= python3
+# System Python + isolated mode: no venv, pip, PYTHONPATH or shell edits.
+PYTHON ?= /usr/bin/python3
+PYTHON_FLAGS ?= -I -B
 -include config.mk
 
 UPSTREAM_URL ?= https://github.com/facebookexperimental/resctl-demo.git
@@ -26,20 +28,20 @@ export EXTRA_RUSTFLAGS EXTRA_CFLAGS EXTRA_CXXFLAGS
 DRIVER_TARGETS := deps deps-runtime deps-plan deps-llvm doctor fetch update-source \
  update-toolchain update-rustup update-deps lock-toolchain versions \
  latest latest-complete fetch-deps build check test-compile smoke stage package \
- verify vendor source-dist kit-dist install uninstall clean clean-vendor lint
+ rebuild verify vendor source-dist kit-dist install uninstall clean clean-vendor lint
 .PHONY: help all $(DRIVER_TARGETS) test runtime-check
 
 help:
-	@$(PYTHON) scripts/build.py help
+	@$(PYTHON) $(PYTHON_FLAGS) scripts/build.py help
 all: package
 
 $(DRIVER_TARGETS):
-	@$(PYTHON) scripts/build.py $@
+	@$(PYTHON) $(PYTHON_FLAGS) scripts/build.py $@
 
 test:
-	@$(PYTHON) -m unittest discover -s tests -v
+	@$(PYTHON) $(PYTHON_FLAGS) -m unittest discover -s tests -v
 
 # Path is read from the environment by argparse's default, never shell-interpolated.
 runtime-check:
-	@$(PYTHON) scripts/runtime_check.py
+	@$(PYTHON) $(PYTHON_FLAGS) scripts/runtime_check.py
 export SCRATCH

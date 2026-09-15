@@ -2,7 +2,6 @@
 dist/
 upstream/
 vendor/
-#config.mk
 .buildkit.lock
 __pycache__/
 *.pyc

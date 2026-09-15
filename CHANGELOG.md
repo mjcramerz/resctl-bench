@@ -1,5 +1,25 @@
 # Changes
 
+## 2.1.0 - 2026-09-15
+
+* Fix fragile top-level imports of latest/debian: load the bundled files directly,
+  with private module names. Work under Python -P/-I/PYTHONSAFEPATH and avoid
+  importing unrelated site-packages. Report incomplete extractions without a traceback.
+* Use isolated system Python for Makefile and installer/verification entrypoints.
+* Make plain `make` and `make package` the full online setup/build/binary-tarball
+  workflow. Preserve latest/latest-complete; add `make rebuild` for locked inputs.
+* Find the existing rustup without requiring a PATH export or config.mk edits.
+* Authenticate sudo on the terminal before logging APT output; prevent hidden
+  password-prompt hangs. Builds remain unprivileged.
+* Publish dist/resctl-bench-latest.tar.gz plus its SHA256, clear stale convenience
+  pointers after failed attempts, and preserve versioned historical artifacts.
+* Validate helper presence and isolated startup in curated distribution trees.
+* Add subprocess Makefile, isolated/safe-path, conflicting-module, missing-file,
+  rustup-discovery, sudo-prompt and complete-workflow regression tests.
+* Exercise make package from a relocated populated source archive using frozen
+  dependencies; exercise the online Makefile with simulated APT/nightly/Cargo
+  boundaries and real GCC ELF packaging. These are not real upstream Rust builds.
+
 ## 2.0.0 - 2026-09-15
 
 * Target Debian Forky explicitly; reject accidental package installation on another release.

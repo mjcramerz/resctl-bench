@@ -63,3 +63,19 @@ Official action releases reviewed for the provided workflow:
 The actions are immutable-pinned and Dependabot checks daily; it proposes
 updates rather than silently merging them. CI uses the moving debian:forky
 container tag deliberately. Container/action execution has not been run here.
+
+## 2.1.0 import/entrypoint fix
+
+Python documents that -P/PYTHONSAFEPATH omits the script directory from the
+import path, while -I also ignores PYTHON environment settings. The driver
+therefore loads its bundled helpers by absolute file location rather than
+requiring users to disable these settings.
+
+https://docs.python.org/3/using/cmdline.html#cmdoption-P
+https://docs.python.org/3/using/cmdline.html#cmdoption-I
+https://docs.python.org/3/library/importlib.html#importing-a-source-file-directly
+
+The original failure is reproducible when safe-path mode omits scripts/ from
+sys.path. Its exact trigger on the reported host is not established from the
+traceback alone. The replacement also handles a genuinely missing helper with
+a precise incomplete-extraction error; it never substitutes a pip package.

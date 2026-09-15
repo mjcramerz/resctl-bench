@@ -163,7 +163,10 @@ def install_dependencies(root: Path, group: str, run: Callable[..., str],
                          write_json: Callable[..., None], *, plan_only: bool = False) -> dict[str, Any]:
     run = c_locale(run)
     require_forky(allow_override=False)
-    prefix = [] if os.geteuid() == 0 else ['sudo']
+    prefix = [] if os.geteuid() == 0 else ['sudo', '-n']
+    if not plan_only and prefix:
+        # Authenticate on the terminal before piping APT output to its build log.
+        run(['sudo', '-v'], interactive=True)
     if not plan_only:
         run([*prefix, 'apt-get', 'update', '--error-on=any'], log=root / '.work/logs/apt-update.log')
     plan = dependency_plan(root, group, run)
