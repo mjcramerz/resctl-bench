@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       upstream_build:
-        description: 'Build actual current upstream and host-installed Rust on Forky; vendor and rebuild offline'
+        description: 'Compile this repaired source with host Rust on Forky; vendor and rebuild offline'
         required: false
         type: boolean
         default: false
@@ -17,18 +17,18 @@ jobs:
     container: debian:forky
     steps:
       - name: Bootstrap test tools in this disposable Forky container
-        run: apt-get update --error-on=any && apt-get install -y --no-install-recommends ca-certificates git make python3 build-essential binutils pkgconf
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        run: apt-get update --error-on=any && apt-get install -y --no-install-recommends ca-certificates git make python3 build-essential binutils pkgconf clang
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # supplied pinned action; not exercised during local validation
         with:
           persist-credentials: false
       - run: make lint test
       - name: Validate the actual distributed entrypoints after extraction
         shell: bash
         run: |
-          make kit-dist
+          make snapshot-dist
           mkdir /tmp/kit-release-check
-          tar -xzf dist/resctl-bench-buildkit-2.2.1.tar.gz -C /tmp/kit-release-check
-          cd /tmp/kit-release-check/resctl-bench-buildkit-2.2.1
+          tar -xzf dist/resctl-bench-buildkit-2.3.0-host-rust.tar.gz -C /tmp/kit-release-check
+          cd /tmp/kit-release-check/resctl-bench-buildkit-2.3.0-host-rust
           sha256sum -c SHA256SUMS
           PYTHONSAFEPATH=1 make help lint test
   real-upstream:
@@ -42,7 +42,7 @@ jobs:
           persist-credentials: false
       - name: Verify the preinstalled host tools
         run: make doctor TOOLCHAIN=host TUNE=portable
-      - run: make latest-complete verify TOOLCHAIN=host TUNE=portable
+      - run: make package verify source-dist TOOLCHAIN=host TUNE=portable
       - name: Relocate the populated source distribution and compile offline
         shell: bash
         run: |

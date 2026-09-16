@@ -1,4 +1,22 @@
-# Build design and operating guide
+# Build guide - repaired native source, build kit 2.3.0
+
+## Mandatory native repair gates
+
+`make package` uses actual host Cargo to compile the reviewed locked workspace;
+then it runs the 10 rd-agent embedded-support tests and 8 rd-util findmnt-JSON
+tests. It verifies exported helper bytes from the compiled agent before build
+success and again after stripping. Results and logs are included in build
+provenance. There is no fallback to the old binary or a successful source-only
+check. See NATIVE-REPAIR.md for details and VALIDATION.md for what was possible
+in the delivery environment. Build as an ordinary user; use sudo only for
+explicit system/package changes and the benchmark launcher.
+
+A source release hash check is not evidence of a successful native compile.
+Host-only compilation and all dependencies still have to work on the build host.
+`make doctor` checks real tools before the main build. No toolchain installation
+or nightly fallback is performed. `make package` does not attach BPF or exercise
+a disk; the explicit runtime probe and Lab handle those separate levels.
+
 
 ## Platform contract
 
@@ -20,8 +38,8 @@ Neither switch makes the host supported or establishes tested compatibility.
 make doctor            # Probe already-installed host Rust/C/C++.
 make package           # Build locked source; no APT, Rust update or cargo update.
 make                   # Same as make package.
-make latest            # Explicitly refresh main/crates using existing host Rust.
-make latest-complete   # Also vendor and produce a populated source tarball.
+make test-runtime      # Run only the 18 safe native repair regressions.
+make source-dist       # Vendor locked crates and produce a populated source tarball.
 make rebuild           # Same locked build/package behavior as package.
 make verify            # Check the last runtime archive and staged payload.
 ```
@@ -30,8 +48,9 @@ make verify            # Check the last runtime archive and staged payload.
 source lock and Cargo.lock, and needs network only for uncached dependencies
 (or an initial source fetch in a kit-only extraction). `OFFLINE=1` forbids Cargo
 network access and requires existing sources and cached/vendored dependencies.
-`latest` and `latest-complete` require online operation and `UPSTREAM_REF=main`;
-they update source/dependencies, never Rust or APT packages. `UPSTREAM_URL`
+For this patched release, `latest`, `latest-complete` and `update-source` are
+blocked: an automatic upstream refresh must not silently discard the repair.
+Explicitly rebase and review a future patch rather than bypassing this guard. `UPSTREAM_URL`
 defaults to the official repository; a custom URL is a trusted-input choice.
 `UPSTREAM_REF` affects initial fetch or explicit source update. Afterwards the
 full locked SHA is authoritative and source changes are rejected.
@@ -126,7 +145,7 @@ with `--config`; it never replaces Cargo home's config.
 
 ### Entrypoint and bundled helpers
 
-The Makefile uses `/usr/bin/python3 -I -B`. Bundled `debian.py` and `host_rust.py`
+The Makefile uses `/usr/bin/python3 -I -B`. Bundled `debian.py`, `host_rust.py` and `runtime_support.py`
 are loaded by their paths next to `build.py`, under private module names.
 Neither PYTHONPATH nor script-directory insertion is required. Missing helpers
 produce an incomplete-extraction error, not a request to pip-install a module.
@@ -143,8 +162,8 @@ remain authoritative. There is no `--breaking`, `--ignore-rust-version`,
 all-features toggle, sed rewrite of crate versions, or unlocked build retry.
 
 The resulting `dependency-lock/` holds Cargo.lock, its unified diff, update
-log, hashes, toolchain identity and source linkage. The pristine `upstream/`
-checkout stays untouched and clean. A generated build workspace uses the new
+log, hashes, toolchain identity and source linkage. The reviewed `upstream/`
+checkout retains its source patch and true base Git identity. A generated build workspace uses the new
 lock with the original Git HEAD: Git correctly reports that lock modification
 as dirty. No fake clean commit or overridden VERGEN SHA is supplied.
 
@@ -214,12 +233,14 @@ inputs, not contained by this driver.
 `make doctor` compiles and executes tiny Rust/C/C++ probes; it is not a workload
 or a check of upstream compilation. `make check` runs Cargo check for selected
 binaries. `make test-compile` uses Cargo test --no-run, never executes upstream
-tests. `make smoke` runs only --help and --version with temporary HOME.
+tests. `make smoke` first builds and verifies exported embedded files, then
+runs --help and --version with temporary HOME.
 No build target invokes `resctl-bench deps` or starts the agent.
 
 Every real executable must be ELF64 little-endian for the selected machine,
 PIE, full RELRO, and have a non-executable GNU stack. Packaging verifies input
-hashes, performs debug separation, runs CLI smoke checks and records readelf
+hashes, runs the two filtered Rust regression suites, performs debug separation,
+checks compiled helper exports again, runs CLI smoke checks and records readelf
 output. Default binaries are resctl-bench, rd-agent, rd-hashd, resctl-demo.
 `WITH_DEMO=0` omits only the interactive demo. AWS Lambda is not enabled.
 
@@ -233,7 +254,8 @@ output. Default binaries are resctl-bench, rd-agent, rd-hashd, resctl-demo.
 | update-toolchain / update-rustup / lock-toolchain | Disabled / disabled / record host identity locally. |
 | update-deps / fetch-deps | Refresh compatible dependency overlay / fetch locked dependencies. |
 | versions / doctor | Print provenance / probe compiler and linker. |
-| package / latest / latest-complete | Locked runtime build / explicit source-crate refresh / refresh plus vendored source. |
+| package / latest / latest-complete | Locked repaired runtime build / blocked for this patch / blocked for this patch. |
+| test-runtime | Compile and execute the 18 isolated native repair tests; no hardware workload. |
 | build / check / test-compile | Release binary build / check / compile tests without running. |
 | smoke / stage / rebuild / verify | CLI checks / stage payload / package selected inputs / verify latest result. |
 | vendor / source-dist / kit-dist | Vendor locked crates / vendored source archive / build-kit-only archive. |

@@ -2,8 +2,17 @@
   "cargo_lock_sha256": "fff9f4c6aed12b24be9533907308943b06027e534f8e9466dccd2904831d23a7",
   "commit": "bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b",
   "commit_epoch": 1782934368,
+  "patchset": {
+    "base_manifest": "patches/base-source-manifest.json",
+    "base_manifest_sha256": "b18d09430f157b43c77393109558a52709c42455b6404c2251adc830aac30c92",
+    "id": "embedded-runtime-compat-v1",
+    "path": "patches/0001-embedded-runtime-compat.patch",
+    "runtime_contract": "compat/runtime-contract.json",
+    "runtime_contract_sha256": "5c1c56efe920d2914afb26a4a662892176ebc75b493d8bb8048f8109c6fd3ccc",
+    "sha256": "ae1b15320b8b94fa4adf0043c145fd261c6040431637898df0212bbabaa571bc"
+  },
   "requested_ref": "main",
-  "schema": 1,
-  "source_manifest_sha256": "b18d09430f157b43c77393109558a52709c42455b6404c2251adc830aac30c92",
+  "schema": 2,
+  "source_manifest_sha256": "7b8a2a0b3d211065d1620690594aa0ea3f73e6912185c1ddb4e58d940d79a99c",
   "url": "https://github.com/facebookexperimental/resctl-demo.git"
 }

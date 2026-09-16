@@ -1,20 +1,38 @@
-# resctl-bench build kit 2.2.1 - host Rust, no toolchain installation
+# resctl-bench complete source release - build kit 2.3.0
 
-**2.2.1 fixes the inherited `CARGO_TARGET_DIR` failure.** Keep your existing
-shell environment and global Cargo configuration. `make package` now scopes
-conflicting build variables away in its child processes instead of rejecting
-them. Final and intermediate output stays under project-local `.work/`; your
-shared Cargo target directory is not touched. Registry/proxy/credential settings
-and `CARGO_HOME` remain available. Host Rust is still used without installation.
+This is the complete supplied resctl workspace, with a reviewed **native source
+repair**, not another IOCost Lab wrapper or a substitute benchmark. The upstream
+package version remains 2.2.6. The base commit is
+`bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b`; the intentional local patch is recorded
+in `patches/` and `source.lock.json` and the native version retains its honest
+`-dirty` suffix.
 
+## What failed and what changed
 
-This version builds with Rust already installed on your host. It does not
-install, update, or select a new Rust release, change a Rustup default/override,
-rewrite a Cargo configuration, or edit a shell startup file.
+The supplied output records a successful patched latency probe, then
+`resctl-bench` starts `rd-agent --reset`. Reset deletes `work/misc-bin/` and the
+old binary regenerates the original, incompatible BCC helper. Its compiler then
+fails the `sizeof(struct filename) % 64 == 0` assertion. A wrapper-only file
+patch cannot survive that lifecycle.
 
-## Build the included source
+This release embeds the Python 3/BCC language-option correction **in rd-agent's
+source**. Startup also atomically reconciles old generated helpers with the
+executable's embedded bytes. Reset and ordinary restarts therefore use the same
+reviewed source. The BPF measurement program, coefficient generator, benchmark
+jobs and result schema are unchanged.
 
-Run from the extracted directory as your ordinary user:
+The archive also exposed native Btrfs device-lookup warnings. The old native
+lookup tried to stat display strings such as `/dev/nvme0n1p6[/@]`. It now requests
+structured findmnt JSON with `--nofsroot --target` and validates the resolved
+block device. This applies to both the workload filesystem and swapfiles.
+
+See **docs/NATIVE-REPAIR.md** for evidence, source paths, limitations and the
+verification design. No kernel header, system-wide Python link or BCC installation
+is patched. No tracing assertion is removed and no latency data is fabricated.
+
+## Build as your ordinary user
+
+From the extracted source directory:
 
 ```sh
 sha256sum -c SHA256SUMS
@@ -23,116 +41,137 @@ make package
 make verify
 ```
 
-`make doctor` checks the selected tools and compiles small Rust/C/C++ probes.
-`make package` builds and packages the locked source. It does **not** invoke
-APT, sudo, a Rust installer, `cargo update`, or a source refresh. It may download
-missing **crate dependencies**, using your existing Cargo registry/cache settings.
-The output is `dist/resctl-bench-latest.tar.gz`, plus its `.sha256` sidecar and a
-versioned archive. Packaging runs only the binaries' `--help` and `--version`;
-it does not run benchmarks or modify IOCost, cgroups, systemd, or devices.
+Do **not** run compilation with sudo. The default is the installed host Rust,
+`TUNE=native`, thin LTO, all four binaries and split debug information. Choose
+`make package TUNE=portable` to omit native CPU tuning when distributing to other
+compatible CPUs; that does not remove shared-library requirements.
 
-The default is `TOOLCHAIN=host`. Native Rust tools on PATH take precedence;
-Rustup is **not required**. Existing Rustup symlink/hardlink proxies are resolved
-to their already-installed concrete tools with read-only `rustup which` queries.
-`RUSTUP_AUTO_INSTALL=0` is set for the build subprocesses. A missing compiler
-causes an error, never an installation attempt. The host compiler must still
-support the locked source and dependencies; no nightly or compiler upgrade is
-silently substituted for an incompatible host.
+`make doctor` compiles small Rust/C/C++ probes and checks the actual selected
+host tools. `make package` compiles locked source, runs the 18 new file-only and
+JSON-parsing Rust regressions, exports the compiled embedded helpers and verifies
+them byte-for-byte before and after stripping, runs CLI smoke checks, and only
+then publishes the runtime archive. Build tests do not run storage workloads,
+change swap, invoke normal rd-agent startup, or attach BPF.
 
-Explicit Debian executable paths are supported:
+The verified runtime archive is:
 
-```sh
-make package HOST_RUSTC=/usr/bin/rustc HOST_CARGO=/usr/bin/cargo HOST_RUSTDOC=/usr/bin/rustdoc
+```text
+dist/resctl-bench-latest.tar.gz
+dist/resctl-bench-latest.tar.gz.sha256
 ```
 
-Those paths must exist. Otherwise leave the variables unset to use PATH. Standard
-`RUSTC`, `CARGO`, and `RUSTDOC` environment values are also accepted; `HOST_*`
-values take precedence. Fallback executable discovery checks the existing
-`$CARGO_HOME/bin` and `$HOME/.cargo/bin`, without changing your shell PATH.
-`TOOLCHAIN=<name>` is an optional request for an **already-installed** Rustup
-selection; it never installs that name. An inherited `RUSTUP_TOOLCHAIN` is
-respected when resolving host Rustup proxies.
+The versioned archive is alongside it. `.work/last-package.json` records the
+verified stage. A failed package attempt removes stale latest/success pointers;
+it does not reuse an old executable as a successful build.
 
-## Existing Cargo configuration stays in place
+Build logs, exact commands, compiler/CPU flags, ELF information, source and
+Cargo hashes, and embedded-support/test results are included in the runtime
+package under `share/resctl-bench/build/`.
 
-Your `CARGO_HOME` is honored; when unset, the usual `$HOME/.cargo` is used.
-Existing `config`/`config.toml` files in Cargo home and `.cargo` configurations
-in parent directories are accepted as trusted Cargo inputs, not rejected,
-renamed, removed, truncated, or rewritten. Registry/mirror settings remain
-available. Cargo may update its normal dependency cache; that is distinct from
-rewriting configuration files. The kit's build flags, selected executables and
-output directory are set only for child processes. Generated vendor settings
-are written only to `.work/vendor-config.toml` and supplied through `--config`.
+### Existing toolchains and dependencies
 
-The former error about an existing Cargo config has been removed. You do not
-need to move or delete `/pool/cache/.../cargo/config.toml` or replace your global
-configuration. To deliberately use a separate cache, pass a project-local
-`CARGO_HOME="$PWD/.work/cargo-home"`; this is optional, not required.
+The kit does not install or update Rust, change a rustup default, rewrite Cargo
+configuration, unset variables in your shell, or switch compilers after a
+failure. Already installed native Rust or rustup-managed tools are supported.
+Explicit `HOST_RUSTC`, `HOST_CARGO`, and `HOST_RUSTDOC` paths are optional.
+Inherited Cargo output/flag overrides are scoped away only in child processes;
+all build output stays in `.work/`. Normal registry/cache configuration is kept.
 
-## Complete source, not a patch-only kit
+GNU Make, Python 3.11+, Git, C/C++ tools, binutils, pkg-config, OpenSSL development
+files and compatible installed Rust/Cargo/rustdoc are prerequisites. The existing
+Debian Forky build policy is retained. `make deps-plan` previews its optional
+package transaction; `make deps` and `make deps-runtime` are explicit package
+changes and are never invoked by `make package`. See `packages/` and docs/BUILD.md.
 
-The `resctl-bench-buildkit-2.2.1-host-rust.tar.gz` source snapshot includes the
-full supplied upstream workspace, Cargo manifests/lock, documentation, licenses,
-minimal real Git object store, build scripts, tests, and host-only defaults.
-The source commit is `bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b`. All 163 upstream
-source files in the supplied source manifest remain byte-for-byte unchanged.
-The build orchestration is modified; no substitute or synthetic resctl-bench
-implementation is supplied.
+On other Debian versions, `ALLOW_UNSUPPORTED_DEBIAN=1 make package` is an
+explicit experimental build override, not permission to use Forky APT commands
+or a claim of verified platform support.
 
-Third-party Cargo crate sources were not in the supplied ZIP and are **not
-vendored in this delivered snapshot**. A first build requires registry access
-or a sufficiently populated host cache. `make package OFFLINE=1` uses frozen,
-network-disabled Cargo commands and requires those dependencies already available.
+The full project source is included. Third-party Cargo crates were not in the
+uploaded ZIP and are **not vendored in this source snapshot**. A first build
+needs a populated cache or access to the locked crate sources. After obtaining
+those dependencies, `make source-dist` produces a source distribution with
+vendored crates. `OFFLINE=1` requires those dependencies already available.
+`latest`, `latest-complete`, and `update-source` are intentionally blocked for
+this patched release so they cannot silently discard the repair. Rebase and
+revalidate a future source update explicitly.
+
+## Actually use the new build with IOCost Lab
+
+**Running the old Lab menu without selecting the new runtime will still use its
+old bundled binaries.** The included executable bridge prevents that mistake.
+After the successful build above, as root for the benchmark only:
 
 ```sh
-make snapshot-dist     # Full selected project source; no Rust or network needed.
-make source-dist       # Full selected source plus vendored Cargo dependencies.
-make kit-dist          # Build-driver code only; not the complete source snapshot.
+sudo ./RUN-IOCOST-LAB.sh --lab /absolute/path/to/iocost-lab
 ```
 
-`source-snapshot.json` describes the delivered snapshot's dependency coverage.
-Old local caches/logs and the obsolete nightly-selection file are not shipped.
-The included upstream workflows/docs are preserved source material; only the
-root Makefile and root build-kit workflow implement this host-only build policy.
-Do not run the separate upstream Lambda deployment workflow as a local build.
+It checks the staged package, contract and actual embedded helper bytes, then
+shows full report / full report and install / preflight actions. It passes the
+new runtime through the Lab's existing `--runtime-dir`; it never silently falls
+back to the old archive. The existing IOCost Lab 1.5.0 maintenance plan, device
+selection, reports and recovery stay in control. There is no scratch prompt.
+`--lab` identifies your existing Lab code directory, not a workload directory.
 
-## Explicit maintenance only
+To verify the handoff without launching anything:
 
-`make latest` and `make latest-complete` deliberately refresh upstream `main`
-and compatible crates, still using unchanged host Rust. They do not run APT.
-`make update-source` and `make update-deps` provide the separate refresh steps.
-`make update-toolchain` and `make update-rustup` are disabled with explanatory
-errors. `make lock-toolchain` records host tool versions in project-local
-`toolchain.lock.json`; that file is provenance, not an installation prescription.
-Legacy `toolchain-selection.json` files are ignored.
+```sh
+./RUN-IOCOST-LAB.sh --lab /absolute/path/to/iocost-lab --action full --plan
+```
 
-Build prerequisites must already be installed. The original Forky-only APT
-helper remains available **only** as explicit `make deps`, `make deps-llvm`, or
-`make deps-runtime` actions. Such actions change system packages and may trigger
-Debian maintainer scripts; do not invoke them as read-only checks. The build
-requires GNU Make, Python 3.11+, Git, C/C++ tools, binutils, pkg-config, OpenSSL
-development files, and a suitable installed Rust/Cargo/rustdoc set. See
-`packages/build.txt` for the non-Rust package list. No target installs Rust.
+The bridge preserves the directory from which it is invoked. **Launch on the
+disk you intend to calibrate** because IOCost Lab writes `output/`, including
+its workload files, below that directory. A USB repository or USB boot is not
+required. The source/build tree may be elsewhere:
 
-The platform policy remains Debian Forky on native amd64/arm64 GNU/Linux.
-`ALLOW_UNSUPPORTED_DEBIAN=1` is an explicit experimental-build override for other
-Debian environments, never permission to run Forky APT transactions there.
-Do not use `sudo make package`. `ALLOW_ROOT_BUILD=1` is for disposable CI only.
+```sh
+cd /existing/directory/on/the/selected/disk
+sudo /absolute/path/to/this-source/RUN-IOCOST-LAB.sh --lab /absolute/path/to/iocost-lab
+```
 
-`TUNE=native` and thin LTO are defaults. Use `TUNE=portable` for no native CPU
-flags; shared-library compatibility remains your responsibility. See
-`config.mk.example`, `make help`, and `docs/BUILD.md` for all controls.
+The default four linked full-mode stages remain `iocost-params`, `hashd-params`,
+`iocost-qos`, `iocost-tune`. Storage fio is an internal upstream coefficient
+calibration dependency, not a replacement entry point. Zram is not a calibration
+target; temporary swap handling remains the approved Lab maintenance operation.
 
-## Verification and limitations
+## Runtime verification without a workload
 
-Run `make lint test`. The regression suite validates host tool discovery,
-no-installer behavior, preservation of configuration bytes/mtimes, real Make
-entrypoints, real Git/ELF/debug packaging, source completeness, and relocation.
-Rust/Cargo operations in pipeline tests are explicitly simulated; generated test
-ELFs are tiny C fixtures, not resctl-bench. No fixture binaries are included.
+Extract the generated runtime archive to a new directory. From its root:
 
-This authoring environment has no installed Rust/Cargo, so a real upstream Rust
-compilation was not performed and is not claimed. `docs/VALIDATION.md` and
-`docs/test-results.txt` contain the actual checks and limitations. Read
-`docs/RUNTIME.md` before any benchmark execution; a successful build is not a
-runtime safety or IOCost measurement certification.
+```sh
+python3 -I -B runtime_support.py
+```
+
+This exports and hashes the actual binary's four embedded helpers, as an
+ordinary user. It cannot establish that your kernel accepts the BPF program.
+For a separate, explicitly requested real collector initialization test:
+
+```sh
+sudo /usr/bin/python3 -I -B runtime_support.py --probe-latency nvme0n1
+```
+
+Replace the example with the selected whole disk. The probe attaches real BPF
+but does not start a storage workload or change swap. A failure is reported,
+never bypassed. Normal benchmarking retains its own startup check. Read
+`docs/RUNTIME.md` before benchmarking: it remains a write-heavy whole-host
+maintenance operation with filesystem trim and potential data-loss risks.
+
+## Source completeness and validation
+
+All 163 upstream working-tree files are present. The ZIP's missing 160 files
+were recovered from its own Git objects and checked against its original
+manifest before applying the repair. Original notices and licenses are retained.
+Only the reviewed files recorded in the patch differ from the base. No uploaded
+host logs, private user Git configuration, old binaries or build caches ship.
+
+`make lint test` runs the Python/source/packaging suite, including real Git,
+Make, C ELF, findmnt and Clang fixtures. Synthetic Cargo/BCC fixtures are clearly
+labelled and are not native Rust or live BPF tests. `make test-runtime` uses
+**real Cargo** on a build host to compile and execute the 18 selected Rust tests.
+
+The delivery environment had no Rust/Cargo and could not fetch a toolchain;
+**this modified Rust workspace was not compiled here**. No live kernel BPF test,
+physical benchmark, systemd-agent startup or swap transaction was performed here.
+See `docs/VALIDATION.md` and the actual `docs/test-results.txt` rather than
+interpreting fixture passes as target-host success. Packaging is configured to
+require the real native gates on your build host.

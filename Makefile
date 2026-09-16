@@ -32,7 +32,7 @@ export HOST_RUSTC HOST_CARGO HOST_RUSTDOC RUSTC CARGO RUSTDOC
 DRIVER_TARGETS := deps deps-runtime deps-plan deps-llvm doctor fetch update-source \
  update-toolchain update-rustup update-deps lock-toolchain versions \
  latest latest-complete fetch-deps build check test-compile smoke stage package \
- rebuild verify vendor source-dist snapshot-dist kit-dist install uninstall clean clean-vendor lint
+ test-runtime rebuild verify vendor source-dist snapshot-dist kit-dist install uninstall clean clean-vendor lint
 .PHONY: help all $(DRIVER_TARGETS) test runtime-check
 
 help:

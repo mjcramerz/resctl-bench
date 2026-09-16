@@ -1,91 +1,79 @@
-# Runtime preparation and NVMe/IOCost boundaries
+# Runtime and benchmarking boundaries
 
-Building and packaging do not prepare a production host for benchmarking.
-Use a dedicated benchmark host with disposable scratch data, backups, a
-maintenance window and out-of-band access. Review the README and resctl-bench
-documentation packaged from the EXACT selected upstream revision. Latest
-source/nightly/dependencies are moving inputs, not a tested compatibility matrix.
+## Select the rebuilt runtime, not the old vendor archive
 
-## Explicit dependency installation
+After `make package verify`, use the source root's `RUN-IOCOST-LAB.sh --lab
+/absolute/path/to/iocost-lab`. It verifies the package and actual embedded helpers
+and passes --runtime-dir explicitly. The existing Lab 1.5.0 handles the full
+benchmark and reports. The bridge does not rewrite the Lab, replace its archive,
+autoformat media, or grant maintenance permissions silently.
 
-`make deps-runtime` installs the newest declared runtime packages available in
-configured Forky indexes, with the same no-removal/no-cross-release policy as
-build dependencies. It does not install a kernel or flash NVMe firmware. Debian
-maintainer scripts can start/restart services, including oomd; review the APT
-plan. The project's oomd is not interchangeable with systemd-oomd.
+The build tree can be on any suitable filesystem. The **invocation directory
+for the Lab** must be on the selected calibration disk because the Lab puts
+output, work files and any temporary swap there. No scratch argument is needed.
+Using USB for the repository is optional; launching in a USB output directory
+while selecting a different disk is intentionally rejected by the Lab.
 
-The package list includes storage fio, stress, Python BCC, gnuplot-nox, oomd,
-systemd/util-linux/coreutils, btrfs-progs, nvme-cli/smartmontools, and native
-kernel-workload build dependencies. Do not replace storage fio with the unrelated
-Python program named fio. Do not install arbitrary pip BCC packages over the
-Debian python3-bpfcc module. A virtual environment or earlier PATH entry can
-hide `/usr/bin/python3` and its system packages.
+## Separate levels of verification
 
-Keep Forky's running kernel and any required headers matched through ordinary
-Debian administration. Headers for a different newly installed kernel are not
-headers for the currently running kernel. BTF and successful Python imports
-are evidence of specific prerequisites, not proof that a BCC program compiles
-and attaches on that kernel. No driver or BPF program is loaded by this kit.
+`make doctor` tests the installed compiler/linker tools. `make package` compiles
+and tests reviewed source, checks real embedded files and creates the runtime.
+Neither action starts a storage workload or attaches BPF. The optional
+`make runtime-check` reads a host checklist and cannot prove BPF attachment.
 
-## Read-only inventory
+The generated runtime's `python3 -I -B runtime_support.py` is a file-only compiled
+helper check, safe to run as an ordinary user. `sudo /usr/bin/python3 -I -B
+runtime_support.py --probe-latency DEVICE` is a distinct explicit kernel probe:
+it exports and verifies the exact helpers, then executes the actual collector
+with interval zero. It requires a physical whole-device sysfs identity, prints
+structured diagnostics, and fails on real compiler/attach errors. It does not
+run fio, touch swap, run the ordinary agent lifecycle or fabricate observations.
 
-```sh
-make runtime-check SCRATCH=/existing/benchmark/filesystem
-```
+Normal benchmarking retains the real agent's BPF initialization. The build
+checks never substitute --no-iolat or a fake collector. The supplied header
+failure is corrected with C language flags, not by removing kernel assertions.
 
-The directory must already exist. The checker never creates it or accepts a
-raw block device as a scratch directory. Without SCRATCH it inventories only
-the visible host. The JSON contains systemd PID1, cgroup-v2 controllers and
-IOCost model/QoS interfaces, PSI, selected kernel config options, swap presence,
-BCC import checks under Debian and PATH Python, storage fio identity and its
-advertised io_uring engine, the global io_uring restriction setting, running
-kernel/header/BTF visibility, CPU governors/frequency limits/boost policy, and
-mount/backing-block-queue details when identifiable.
+## Host prerequisites remain real requirements
 
-The io_uring engine listing does not issue workload IO. io_uring_disabled=1
-still imposes permission restrictions even though the feature is not globally
-disabled. BPF imports do not attach probes. CPU and storage settings are READ,
-never changed. Missing interfaces in a container can reflect isolation rather
-than absent kernel functionality. A namespace-local view cannot certify the
-physical host configuration.
+The full supplied resctl suite uses systemd, cgroup v2/IOCost kernel support,
+Btrfs features, appropriate directly attributable storage/swap and the packages
+listed in packages/runtime.txt. A package/compiler success cannot add missing
+kernel features or make unsupported RAID/multi-device layouts valid.
 
-Exit 0 means the inspected checklist passed; exit 2 means prerequisites were
-missing/unconfirmed; exit 1 indicates an inspection error. None means a device
-is safe to benchmark, all jobs work, or an IOCost model is accurate. The
-full-suite checklist can be stricter than an individual benchmark's needs.
+Storage fio is used internally by upstream iocost-params; it is not an
+independent replacement benchmark. Use Debian's python3-bpfcc under system
+Python, not an unrelated pip package called bcc. The running kernel, header
+sources where required, compiler and BCC must work together. The target-host
+collector probe is the check of that combination.
 
-## Review before running upstream manually
+Zram is not the disk target. During the full storage/protection workload, its
+active RAM-backed swap would divert paging activity. The Lab's reviewed
+maintenance plan handles needed temporary disk swap and restoration. The build
+kit itself neither changes swap nor removes the original topology guards.
+Read the existing Lab recovery instructions and keep failed sessions with
+unfinished restoration. Do not manually delete a possibly active swapfile.
 
-Identify the actual scratch filesystem and physical backing storage. Check
-partitions, device-mapper/LVM/RAID layers, multi-device Btrfs, free space,
-filesystem/mount options and swap placement. A `/dev/nvme...` name alone does
-not identify the correct benchmark target, physical topology or cgroup block
-accounting level. Verify that the target contains no production or irreplaceable
-data. This kit deliberately supplies no automatic format, discard, sanitize,
-firmware-update, raw-device-write, scheduler-write, or IOCost-write command.
+The Btrfs lookup repair removes display-root suffixes by using findmnt's
+--nofsroot API and JSON, then verifies the actual block device. It does not
+invent a device for overlay/tmpfs/network filesystems or add support for
+ambiguous stacked/multi-device storage. Native swap-parser errors are reported
+rather than silently omitted.
 
-Upstream's full resource-control demonstration expects a systemd/cgroup-v2
-host, appropriate memory/IO accounting and pressure interfaces, Btrfs and swap
-for jobs that exercise those features. An IOCost-enabled kernel must expose
-the appropriate interfaces; inspect the actual kernel rather than assuming a
-Debian version implies readiness. The included checker records relevant config
-values when `/proc/config.gz` or `/boot/config-<running-kernel>` is readable.
+## Maintenance operation, not a harmless speed test
 
-Plan CPU power policy, temperature stabilization, SSD thermal throttling,
-firmware, free-space/preconditioning state, background IO, swap and run order.
-Do not blindly set a performance governor, disable CPU mitigations, toggle
-write caches, or change block schedulers: those decisions affect host safety
-and the meaning of measurements. Benchmark settings should model the intended
-production conditions and remain consistent across comparisons.
+The full plan remains iocost-params, hashd-params, iocost-qos and iocost-tune. A
+complete QoS sweep can be substantially longer than coefficient calibration;
+there is no timer that falsely declares it complete. Full mode is not silently
+reduced to basic calibration.
 
-Before any write-heavy calibration, read the current upstream CLI help and
-job documentation, choose job scope and scratch path deliberately, and review
-which settings the agent changes. `resctl-bench deps` is NOT this kit's read-only
-checker; upstream documents that it starts the agent. Tests in this kit invoke
-only --help and --version on release executables. No Make goal starts rd-agent,
-runs fio workloads, or applies io.cost.model/io.cost.qos values.
+Back up data, close unrelated workloads, use an appropriate maintenance window
+and keep recovery access. Upstream may trim the whole workload filesystem,
+write substantial data, create memory pressure and change host settings/services.
+A private output directory does not limit filesystem-wide trim. Recovery is
+best effort, especially after crashes or power loss. Existing system-disk
+and installation approvals remain in effect.
 
-After controlled runs, retain the exact inputs, result JSON, device topology,
-thermal/power state and competing workloads with the generated model. Validate
-IOCost behavior under representative loads before any separate deployment.
-A build success is not an endorsement of a generated model for production.
+All reports/measurements come from an actual successful Lab run. This source
+archive contains no precomputed coefficients for the user's drive and makes no
+claim that a physical benchmark has been completed. Validate resulting IOCost
+behavior on representative workloads before persistent deployment.

@@ -1,0 +1,18 @@
+{
+  "base_commit": "bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b",
+  "bcc_cflags": [
+    "-fms-extensions",
+    "-Wno-microsoft-anon-tag"
+  ],
+  "bpf_measurement_program_sha256": "5b6f8f06c97aefbefbae2a565a7030a36a79ca9fd00fa6d3b985dfcd3b1da280",
+  "files": {
+    "biolatpcts.py": "d6b2d2cc47ce001c4b16aa0f8210868ccc860a4cf78b85da564c5fc1f1f3b433",
+    "biolatpcts_wrapper.sh": "c715be393071e370768d1fcf2682fa47354bbb1d4d6aafbe19f233edd16cad65",
+    "iocost_coef_gen.py": "459ad36aa658dd7c2d44aebb307a21f9b2399d73440012a2c1a70b9f4111ff91",
+    "sideloader.py": "15ffbe43fd829f48515b621fcc541649bddc24ed6d53ca384fdfe9385ec0feec"
+  },
+  "id": "resctl-2.2.6-embedded-bcc-compat-v1",
+  "iocost_lab_1_5_helper_bytes_compatible": true,
+  "result_schema": "resctl-bench-2.2.6",
+  "schema": 1
+}

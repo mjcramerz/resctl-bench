@@ -33,7 +33,7 @@ from typing import Any, Iterator, Mapping, Sequence
 
 # Do not rely on sys.path containing scripts/: -P, -I, PYTHONSAFEPATH,
 # Python wrappers and third-party packages named "debian" can break that.
-# Load only the two bundled helpers from this driver's own directory.
+# Load only the bundled helpers from this driver's own directory.
 def _load_helper(name: str) -> Any:
     path = Path(__file__).resolve().parent / (name + ".py")
     if not path.is_file():
@@ -57,20 +57,21 @@ def _load_helper(name: str) -> Any:
 
 debian = _load_helper("debian")
 host_rust = _load_helper("host_rust")
+runtime_support = _load_helper("runtime_support")
 
-VERSION = "2.2.1"
+VERSION = "2.3.0"
 ROOT = Path(__file__).resolve().parents[1]
 GIB = 1024**3
 BASE_BINS = ("resctl-bench", "rd-agent", "rd-hashd")
 KIT_ITEMS = ("Makefile", "README.md", "LICENSE", "NOTICE.md", ".gitignore",
              ".editorconfig", "config.mk.example", "scripts", "tests", "docs",
-             "packages", ".github", "CHANGELOG.md")
-HELP = """resctl-bench-buildkit 2.2.1 (Debian Forky, native amd64/arm64 GNU/Linux)
+             "packages", ".github", "CHANGELOG.md", "compat", "patches", "RUN-IOCOST-LAB.sh")
+HELP = """resctl-bench-buildkit 2.3.0 (Debian Forky, native amd64/arm64 GNU/Linux)
 
   make                  Same as make package (host Rust; locked source)
   make package          Build locked sources with host Rust; no APT or toolchain changes
-  make latest           Explicitly update source/crates, then package with host Rust
-  make latest-complete  Same, plus populated source tarball with vendored crates
+  make latest           Blocked for this reviewed patch; rebase source explicitly
+  make latest-complete  Blocked for this reviewed patch; use package + source-dist
   make deps             Install newest declared build packages from Forky (sudo for APT)
   make deps-plan        Simulate the Forky dependency transaction using current indexes
   make deps-runtime     Explicitly install runtime packages (may start distro services)
@@ -81,14 +82,15 @@ HELP = """resctl-bench-buildkit 2.2.1 (Debian Forky, native amd64/arm64 GNU/Linu
   make versions         Show source/toolchain/dependency locks and local package versions
   make doctor           Validate installed compiler, host, tools and flags
   make fetch            Fetch once; lock Git commit and all source file hashes
-  make update-source    Explicitly move source lock to UPSTREAM_REF (clean only)
+  make update-source    Blocked while a reviewed native source patch is selected
   make lock-toolchain   Record current host compiler identity (project-local metadata)
   make fetch-deps       Download dependencies without changing Cargo.lock
   make build            Build resctl-bench, rd-agent, rd-hashd, resctl-demo
   make check            Cargo check selected packages with --locked
   make test-compile     Compile upstream tests; DO NOT execute them
+  make test-runtime     Compile/run ONLY file-support and device-JSON Rust regressions
   make smoke            Build; run only each binary's --version and --help
-  make stage            Build, stage, split debug symbols, verify, smoke test
+  make stage            Build, test embedded support, stage, split debug, verify
   make rebuild          Package the already selected source/toolchain/dependencies
   make all              Same as package
   make verify           Verify hashes of the most recently packaged release
@@ -491,7 +493,25 @@ class Builder:
             raise BuildError("Upstream files differ from the source lock; preserve your edits and review them first")
         if self.git("rev-parse", "HEAD") != lock["commit"]:
             raise BuildError("Upstream HEAD does not match the locked commit")
-        if self.git("status", "--porcelain", "--untracked-files=all"):
+        changes = self.git("status", "--porcelain", "--untracked-files=all")
+        patchset = lock.get("patchset")
+        if patchset:
+            patch_file = self.root / safe_relative(patchset["path"])
+            if digest(patch_file) != patchset["sha256"]:
+                raise BuildError("Reviewed source patch was changed")
+            # HEAD stays at the real uploaded base commit. The native -dirty
+            # version suffix truthfully identifies this reviewed local delta.
+            delta = self.git("diff", "--no-ext-diff", "--no-textconv", "--binary", "HEAD", "--", ".")
+            if delta != patch_file.read_text().strip():
+                raise BuildError("Source changes differ from the reviewed native-runtime patch")
+            base_manifest = self.root / safe_relative(patchset["base_manifest"])
+            if digest(base_manifest) != patchset["base_manifest_sha256"]:
+                raise BuildError("Original-source preservation manifest was changed")
+            contract = self.root / safe_relative(patchset["runtime_contract"])
+            if digest(contract) != patchset["runtime_contract_sha256"]:
+                raise BuildError("Runtime compatibility contract was changed")
+            runtime_support.validate_source(self.src, contract)
+        elif changes:
             raise BuildError("Upstream Git worktree is dirty")
         if digest(self.src / "Cargo.lock") != lock["cargo_lock_sha256"]:
             raise BuildError("Cargo.lock has changed")
@@ -499,6 +519,14 @@ class Builder:
 
     def fetch(self, update: bool = False) -> dict[str, Any]:
         locked = (self.root / "source.lock.json").exists()
+        if locked and read_json(self.root / "source.lock.json").get("patchset"):
+            if update:
+                raise BuildError("This source release carries a reviewed native compatibility patch. "
+                                 "update-source/latest is blocked so it cannot silently remove the fix. "
+                                 "Rebase and revalidate the patch explicitly; see docs/NATIVE-REPAIR.md.")
+            if not self.src.is_dir():
+                raise BuildError("Patched source tree is missing. Re-extract the complete source tarball; "
+                                 "the base remote commit alone does not contain the repair.")
         if locked and self.src.exists():
             current = self.verify_source()
             if not update:
@@ -863,10 +891,10 @@ class Builder:
         tools = self.tools()
         argv = [tools["cargo"], *self.vendor_config(), command,
                 "--manifest-path", str(self.effective_source() / "Cargo.toml"),
-                "--frozen" if self.cfg.offline else "--locked", *extra]
+                "--frozen" if self.cfg.offline else "--locked"]
         if command in ("build", "check", "test"):
-            # Command-line precedence also makes artifact collection explicit.
             argv += ["--target-dir", env["CARGO_TARGET_DIR"]]
+        argv += list(extra)
         output = run(argv, cwd=self.effective_source(), env=env, log=log)
         self.effective_source()  # Reject source/lock modifications by Cargo/build scripts.
         return output
@@ -892,6 +920,42 @@ class Builder:
                           "overridden_ambient_variables": self.environment_overrides(),
                           "output_root": str(self.work)}, indent=2))
 
+    def verify_runtime_support(self, binary_dir: Path, destination: Path) -> None:
+        contract = runtime_support.validate_source(self.effective_source(), self.root / "compat/runtime-contract.json")
+        result = runtime_support.run_export(binary_dir, contract, environment=self.environment())
+        write_json(destination, result)
+
+    def runtime_tests(self) -> dict[str, Any]:
+        env, settings = self.cargo_context()
+        out = self.work / "builds" / settings["build_id"]
+        out.mkdir(parents=True, exist_ok=True)
+        result_file = out / "runtime-unit-tests.json"
+        result_file.unlink(missing_ok=True)
+        suites = []
+        combined = []
+        selections = [
+            ("rd-agent", ["--bin", "rd-agent"], "misc::support_tests::", 10),
+            ("rd-util", ["--lib"], "storage_info::source_resolution_tests::", 8),
+        ]
+        for package, kind, selector, minimum in selections:
+            log = out / ("runtime-unit-tests-" + package + ".log")
+            self.cargo("test", ["--release", "--target", settings["host"],
+                       "--jobs", str(self.cfg.jobs), "-p", package, *kind,
+                       selector, "--", "--test-threads=1"], env, log=log)
+            output = log.read_text()
+            matched = re.search(r"test result: ok\. (\d+) passed; 0 failed; 0 ignored;", output)
+            if not matched or int(matched[1]) < minimum:
+                raise BuildError("Required native regression tests did not all pass: " + selector)
+            suites.append({"package": package, "filter": selector,
+                           "passed": int(matched[1]), "failed": 0})
+            combined.append("=== " + package + " " + selector + " ===\n" + output)
+        atomic_write(out / "runtime-unit-tests.log", "\n".join(combined).encode())
+        result = {"kind": "actual-rust-unit-tests", "suites": suites,
+                  "passed": sum(item["passed"] for item in suites), "failed": 0,
+                  "storage_workload_run": False}
+        write_json(result_file, result)
+        return result
+
     def build(self, command: str = "build") -> tuple[dict[str, Any], Path]:
         env, settings = self.cargo_context()
         out = self.work / "builds" / settings["build_id"]
@@ -915,6 +979,7 @@ class Builder:
                 raise BuildError(f"Missing executable artifact: {path}")
             validate_elf(path, settings["host"])
             hashes[binary] = digest(path)
+        self.verify_runtime_support(binaries_dir, out / "compiled-support.json")
         metadata = self.cargo("metadata", ["--format-version", "1", "--filter-platform", settings["host"]], env)
         write_json(out / "cargo-metadata.json", json.loads(metadata))
         tree = self.cargo("tree", ["--target", settings["host"], "--edges", "normal,build", *packages], env)
@@ -966,6 +1031,7 @@ class Builder:
     def stage(self) -> tuple[Path, dict[str, Any]]:
         settings, out = self.build()
         result = read_json(out / "result.json")
+        self.runtime_tests()
         version = tomllib.loads((self.src / "resctl-bench" / "Cargo.toml").read_text())["package"]["version"]
         if not re.fullmatch(r"[A-Za-z0-9.+-]+", version):
             raise BuildError("Unsupported upstream version string")
@@ -999,6 +1065,8 @@ class Builder:
                 elf_info.append(f"\n=== {binary} ===\n" + run(["readelf", "-h", "-l", "-d", "-V", target], quiet=True))
             atomic_write(provenance / "elf-info.txt", "".join(elf_info).encode())
             self.smoke(bin_dir, provenance / "smoke-test.json")
+            self.verify_runtime_support(bin_dir, provenance / "compiled-support.json")
+            shutil.copyfile(self.root / "compat/runtime-contract.json", stage / "share/resctl-bench/runtime-contract.json")
             for filename in ("README.md", "CHANGELOG.md", "CONTRIBUTING.md"):
                 if (self.src / filename).is_file():
                     shutil.copyfile(self.src / filename, doc / ("upstream-" + filename))
@@ -1013,7 +1081,7 @@ class Builder:
             shutil.copyfile(self.root / "LICENSE", licenses / "LICENSE.buildkit")
             metadata = read_json(out / "cargo-metadata.json")
             self.collect_licenses(metadata, licenses / "third-party")
-            for p in ("build-info.json", "cargo-metadata.json", "cargo-tree.txt", "build.log"):
+            for p in ("build-info.json", "cargo-metadata.json", "cargo-tree.txt", "build.log", "runtime-unit-tests.json", "runtime-unit-tests.log"):
                 shutil.copyfile(out / p, provenance / p)
             for p in ("source.lock.json", "source-manifest.json", "toolchain.lock.json"):
                 shutil.copyfile(self.root / p, provenance / p)
@@ -1028,7 +1096,8 @@ class Builder:
                 if (self.work / filename).exists():
                     shutil.copyfile(self.work / filename, provenance / filename)
             shutil.copytree(self.root / "packages", provenance / "debian-packages")
-            for p in ("install.py", "runtime_check.py"):
+            shutil.copytree(self.root / "patches", provenance / "source-patches")
+            for p in ("install.py", "runtime_check.py", "runtime_support.py"):
                 shutil.copyfile(self.root / "scripts" / p, stage / p)
                 (stage / p).chmod(0o755)
             shutil.copyfile(self.root / "docs/RELEASE-README.md", stage / "README.md")
@@ -1100,6 +1169,7 @@ class Builder:
                 shutil.copyfile(src, dest)
         for p in (destination / "scripts").glob("*.py"):
             p.chmod(0o755)
+        (destination / "RUN-IOCOST-LAB.sh").chmod(0o755)
         # Archive completeness gate: isolated Python ignores PYTHONPATH and the
         # scripts directory, precisely the environment the old imports broke in.
         for action in ("help", "lint"):
@@ -1276,6 +1346,8 @@ def main() -> int:
             builder.cargo("fetch", ["--target", settings["host"]], env)
         elif action in ("build", "check", "test-compile"):
             builder.build(action)
+        elif action == "test-runtime":
+            builder.runtime_tests()
         elif action == "smoke":
             _, out = builder.build()
             builder.smoke(Path(read_json(out / "result.json")["binaries_dir"]), out / "smoke-test.json")
@@ -1327,7 +1399,7 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except (BuildError, debian.DebianError, host_rust.HostRustError, OSError, ValueError, KeyError) as exc:
+    except (BuildError, debian.DebianError, host_rust.HostRustError, runtime_support.SupportError, OSError, ValueError, KeyError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         if os.environ.get("BUILDKIT_TRACEBACK") == "1":
             raise

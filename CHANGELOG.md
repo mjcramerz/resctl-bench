@@ -1,3 +1,25 @@
+# 2.3.0 - native source repair
+
+- Recovered 160 missing upstream working files from the uploaded Git objects;
+  verified all 163 original paths against the supplied base manifest.
+- Embedded the Python 3/BCC language-option fix in rd-agent, retaining the exact
+  measurement C source. Reset now recreates repaired helpers from the new binary.
+- Reconcile stale generated helpers atomically; refuse symlinks/nonregular files.
+- Add privilege-free --export-support with strict standalone CLI handling and
+  ten native helper/reset regressions.
+- Repair native Btrfs/source/swap lookup using findmnt JSON --nofsroot --target,
+  block-device validation, explicit swap parser errors and eight pure Rust tests.
+- Require actual compiled-helper hash checks and the selected Rust tests before
+  runtime publication; repeat compiled checks after ELF stripping.
+- Preserve host-only Rust, scoped Cargo output, source/lock provenance and the
+  full native resctl pipeline. Guard source updates against silently losing fixes.
+- Add an executable, cwd-preserving RUN-IOCOST-LAB.sh handoff that verifies and
+  explicitly selects the new runtime; never fall back to the Lab's old archive.
+- Add source, Clang, real findmnt, export and packaging regressions; document
+  separately that Rust compilation/BPF/hardware runs were not possible here.
+
+## Historical build-kit changes below
+
 # Changes
 
 ## 2.2.1 - 2026-09-16

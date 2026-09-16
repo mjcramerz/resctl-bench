@@ -193,7 +193,10 @@ elif command == 'update':
     if os.environ.get('FIXTURE_UPDATE_TAMPER') == '1':
         (source/'README.md').write_text('illegal resolver mutation')
 elif command in ('check','test','fetch'):
-    pass
+    if command == 'test' and any(x in args for x in ('misc::support_tests::', 'storage_info::source_resolution_tests::')):
+        print('SYNTHETIC Cargo fixture; no Rust tests executed')
+        n = 10 if 'misc::support_tests::' in args else 8
+        print(f'test result: ok. {n} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;')
 else:
     sys.exit('unexpected cargo command: '+repr(args))
 '''
@@ -207,7 +210,32 @@ class PipelineTests(unittest.TestCase):
         cls.seed_dir = tempfile.TemporaryDirectory()
         root = Path(cls.seed_dir.name)
         c = root / "fixture.c"
-        c.write_text('#include <stdio.h>\nint main(int argc, char **argv) { puts("fixture 0.1.0; not resctl-bench"); return 0; }\n')
+        # Synthetic executable exports the reviewed fixture bytes so real
+        # Make subprocess tests exercise the acceptance gate. This is C, NOT
+        # rd-agent or a Rust compilation; the fixture is never distributed.
+        bodies = [(name, (ROOT / "upstream/rd-agent/src/misc" / name).read_text())
+                  for name in bk.runtime_support.FILES]
+        declarations = ",\n".join("{" + json.dumps(name) + "," + json.dumps(body) + "}" for name, body in bodies)
+        c.write_text('''#include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <limits.h>
+struct asset { const char *name; const char *body; };
+static const struct asset assets[] = {''' + declarations + '''};
+int main(int argc, char **argv) {
+  if (argc == 3 && strcmp(argv[1], "--export-support") == 0) {
+    if (mkdir(argv[2], 0700) != 0) return 2;
+    for (unsigned int i = 0; i < sizeof(assets)/sizeof(assets[0]); i++) {
+      char path[PATH_MAX];
+      if (snprintf(path, sizeof(path), "%s/%s", argv[2], assets[i].name) >= PATH_MAX) return 3;
+      FILE *out = fopen(path, "wx");
+      if (!out) return 4;
+      if (fputs(assets[i].body, out) < 0 || fclose(out) != 0 || chmod(path, 0755) != 0) return 5;
+    }
+  }
+  puts("fixture 0.1.0; not resctl-bench or Rust"); return 0;
+}
+''')
         cls.elf = root / "fixture"
         subprocess.run(["cc", "-g", "-O0", "-fPIE", "-pie", "-Wl,-z,relro,-z,now", str(c), "-o", str(cls.elf)], check=True)
 
@@ -238,6 +266,7 @@ class PipelineTests(unittest.TestCase):
             (crate / "src").mkdir(parents=True)
             (crate / "Cargo.toml").write_text(f'[package]\nname="{binary}"\nversion="0.1.0"\nedition="2021"\n')
             (crate / "src/main.rs").write_text('fn main() {}\n')
+        shutil.copytree(ROOT / "upstream/rd-agent/src/misc", self.remote / "rd-agent/src/misc")
         (self.remote / "resctl-bench/doc").mkdir()
         (self.remote / "resctl-bench/doc/common.md").write_text("Fixture documentation\n")
         git(self.remote, "add", ".")

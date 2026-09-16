@@ -1,104 +1,65 @@
-# Validation status - build kit 2.2.1 (host Rust, ambient Cargo correction)
+# Validation scope - source release 2.3.0
 
-Validation date: 2026-09-16. This report distinguishes build-driver validation
-from actual upstream Rust compilation. No benchmark, IOCost setting change,
-device operation, Rust installation, APT installation or global configuration
-edit was performed.
+## Performed in the delivery environment
 
-## Exact reported failure reproduced and corrected
+The actual results are in `test-results.txt` and `validation.json`. The complete
+Python/source/packaging suite is run in bounded batches because individual
+execution-tool calls have a wall-time cap. Records identify each unique test;
+interrupted partial batches are not counted as completed. The supplied Git
+objects restore the complete source, all original manifest hashes are checked,
+and the final archive is extracted and its manifest/provenance reverified.
 
-The 2.2.0 `scripts/build.py` was placed in an integration-test workspace with
-an exported `CARGO_TARGET_DIR` pointing at a shared directory containing a
-sentinel file. Actual `make package` failed with the reported message:
+Real operations include Python syntax/AST checks, GNU Make entrypoints, Git
+source/patch checks, C compilation to ELF, strip/objcopy/readelf, package and
+installer checksum/conflict tests, extraction/relocation, real util-linux
+findmnt output, and real Clang compilation of a small structure-layout fixture.
 
-```text
-ERROR: Ambient CARGO_TARGET_DIR makes the build ambiguous. Unset it; use documented kit options/EXTRA_*FLAGS.
-```
+The Clang fixture fails the same `40 == 0` structure-layout assertion without
+the required C language extension, also fails with warning suppression alone,
+and passes structure-size/member-offset/access assertions with the correction.
+It is not a compilation of the target host's complete Linux headers or a BPF
+attachment. The real findmnt mountinfo fixture demonstrates that the old query
+returns `/dev/nvme0n1p6[/@]` and --nofsroot returns `/dev/nvme0n1p6` without mounting
+anything or using an actual block device.
 
-Only the driver was replaced with 2.2.1; the same command and inherited
-environment then passed. `make verify` also passed. The shared directory gained
-no files; its sentinel and Cargo config retained identical bytes and nanosecond
-modification times. Rustup, sudo and APT traps were not invoked. All three Cargo
-output-directory variables agreed with the project-local target directory, and
-the compile command included `--target-dir`.
+BCC tests execute the actual helper's Python logic against a clearly marked
+stub BCC constructor. Pipeline tests use synthetic Cargo/Rust scripts and tiny
+real C ELF fixtures to check orchestration, error propagation and packaging.
+Those fixtures are deliberately labelled. Their output is **not** proof of
+native Rust compilation, and no fixture executable is shipped as resctl-bench.
 
-These reproduction runs use simulated Rust/Cargo, real Make/Python/Git,
-real C-compiled ELF fixture binaries and real binutils/archive verification.
-They do not pretend to compile the upstream Rust workspace. Machine-readable
-results and full output are in `docs/cargo-target-regression.json` and
-`docs/cargo-target-regression.txt`.
+## Not performed here
 
-## Executed suite
+The delivery environment has no installed Rust/Cargo and cannot obtain a
+compiler through its network. The modified Rust workspace and its 18 selected
+Rust tests have therefore **not been compiled or executed here**. No modified
+native rd-agent executable is supplied in this source-only archive. No actual
+kernel BPF attachment, normal systemd-agent startup, swap preparation/restoration,
+physical-device workload or measured IOCost configuration installation was
+performed. No GitHub workflow was run. Native amd64/arm64 and different CPUs,
+Debian releases or kernels do not constitute an exercised hardware matrix.
 
-`make lint test`: **116 tests passed**. Full output is `docs/test-results.txt`.
-Syntax/whitespace checks cover all ten Python source/test files. The suite adds
-17 environment-policy tests and replaces the old test that incorrectly expected
-inherited Rust flags to be rejected. Existing extraction coverage now exports
-both target-directory aliases and the intermediate-directory setting.
+There is no native-build success log in this source archive because no such
+build happened. The former user build metadata and raw journals are not
+republished as evidence of this revision.
 
-Coverage includes:
+## Mandatory build-host checks
 
-- Actual `make package verify` with exported absolute and relative target
-  directories, paths containing spaces, existing shared caches and nonexistent
-  shared directories. `make clean` is checked not to delete external caches.
-- Actual Make entrypoints for doctor, fetch-deps, check, test-compile, package
-  and verify with combined target, flag, profile, wrapper, bootstrap, archiver
-  and C/C++ environment overrides. Dependency update and vendoring are tested
-  with inherited output overrides as well.
-- Exported values are not copied into the parent Python environment or written
-  to config files. Notices contain variable names only. Private values are not
-  logged as part of the override report. Explicit EXTRA_*FLAGS still work.
-- Existing Cargo-home, ancestor and project configs, credential files, Rustup
-  settings and shell startup files retain identical bytes and mtimes. Registry,
-  mirror, proxy, certificate and Cargo-home environment settings remain present.
-- Native host tool selection without Rustup, PATH and explicit-path precedence,
-  paths with spaces, Rustup symlink/hardlink proxy resolution using only `which`,
-  disabled auto-install and update targets, missing tools and obsolete lock data.
-- Real Git source checks, ELF architecture/hardening checks, split debug symbols,
-  archive checksums, install conflict handling, source-bundle relocation and
-  offline-mode command flags. Cargo/Rust are fixtures for these pipeline tests.
+`make doctor` exercises the actual installed compiler/linker. `make package`
+compiles the complete selected native binaries, requires their ELF identity and
+compiled helper exports to match the reviewed source, runs the real 10
+rd-agent helper and 8 rd-util parser tests, repeats compiled checks after strip,
+runs CLI smoke checks, and verifies payload checksums before publishing a
+success pointer. Empty native test filters are rejected. These are real checks
+when executed with actual host Cargo, not a substitute for executing them here.
 
-The supplied ZIP was independently compared again: all **163 upstream source
-files**, their source manifest and the locked Cargo.lock are unchanged. The
-commit remains `bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b`. The complete workspace
-and minimal Git metadata are retained. Old local build output is not shipped.
-The final archive is extracted separately and its checksums and suite rerun;
-the separately delivered validation report records those results.
+The stage includes `share/resctl-bench/build/runtime-unit-tests.json` and its
+logs, `compiled-support.json`, exact source/flags/compiler metadata and hashes.
+A source update cannot silently remove the reviewed patch. A failed package
+attempt does not leave the old latest pointer masquerading as a successful build.
 
-## Limits
-
-This authoring environment is Debian 13 (Trixie), not the intended Forky host,
-and has no installed rustc/Cargo. A real upstream Rust compilation/link was
-**not performed**. No Rust toolchain was downloaded or installed to fill that
-gap. Passing fixtures establishes the tested driver behavior, not compatibility
-with every host compiler or arbitrary Cargo configuration. Existing host tools
-and upstream build scripts are trusted code, not sandboxed by the build driver.
-Forced Cargo `[env]` entries and external executable side effects are not a
-security boundary this driver can contain. Tests do not simulate every detail
-of real Cargo configuration parsing.
-
-Third-party Cargo dependencies were absent from the supplied ZIP and are not
-vendored in this archive. First compilation needs registry access or a populated
-Cargo cache. `OFFLINE=1` needs previously cached or vendored dependencies.
-Missing or incompatible host Rust fails without installing a replacement.
-No live Forky APT transaction, real-upstream CI job or IOCost benchmark was run.
-The root CI still requires a pre-provisioned runner for its real-upstream job;
-retained upstream CI files are not root build-kit entrypoints. Existing action
-pins were not revalidated as part of this targeted correction.
-
-## Reproduce on the intended host
-
-Keep the existing host environment, including `CARGO_TARGET_DIR`, unchanged.
-From a fresh extraction as the ordinary user:
-
-```sh
-sha256sum -c SHA256SUMS
-make lint test
-make doctor
-make package
-make verify
-```
-
-Use HOST_RUSTC/HOST_CARGO/HOST_RUSTDOC only when explicit installed paths are
-needed. The driver does not require Rustup for native Debian tools. Do not run
-packaging under sudo. No build target launches the IOCost benchmark workload.
+A further explicitly requested target-host check, `runtime_support.py
+--probe-latency DEVICE`, initializes the actual BPF collector without a storage
+workload. Full benchmarking remains a separate approved maintenance operation
+through IOCost Lab. Its success, accurate measurements and safe restoration
+cannot be established from file exports, imports, compilation or fixture tests.

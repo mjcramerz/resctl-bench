@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Optional: copy to config.mk for reviewed overrides. Host-installed Rust is the default. GNU Make configuration is trusted executable input.
-# Defaults intentionally do not pin outdated Debian package/Rust/source versions.
+# Host Rust is not installed or changed. Source and Cargo.lock are locked by this repair release.
 UPSTREAM_URL ?= https://github.com/facebookexperimental/resctl-demo.git
 UPSTREAM_REF ?= main
 TOOLCHAIN ?= host
@@ -20,8 +20,8 @@ PREFIX ?= /usr/local
 DESTDIR ?=
 FORCE ?= 0
 
-# Latest source/compatible dependencies (host Rust unchanged) + both release/source tarballs:
-# make latest-complete
+# Build this reviewed source (latest/update-source intentionally cannot discard the patch):
+# make package verify
 # Ordinary reproducible-intent rebuild with the already resolved inputs:
 # make rebuild
 # Compile relocated, populated source bundle without Cargo network access:

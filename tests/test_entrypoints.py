@@ -52,6 +52,11 @@ class EntrypointTests(unittest.TestCase):
                                   PYTHONPATH="/nonexistent-python-packages")
         self.assert_success(result)
 
+    def test_bridge_is_executable_after_source_packaging(self):
+        result = self.run_command([str(self.root / "RUN-IOCOST-LAB.sh"), "--help"])
+        self.assert_success(result)
+        self.assertIn("--lab", result.stdout)
+
     def test_make_lint_works_from_an_extracted_style_tree(self):
         self.assert_success(self.run_command(["make", "--no-print-directory", "lint"],
                                             PYTHONSAFEPATH="1"))

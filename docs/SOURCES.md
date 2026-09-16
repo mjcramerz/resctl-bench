@@ -1,138 +1,57 @@
-# Source basis and reference review
+# Source provenance and coverage
 
-## 2.2.1 ambient-environment correction - 2026-09-16
+This release is based on the user's resctl-bench.zip, not an independently chosen
+replacement repository. Its upstream HEAD and lock identify:
 
-Inputs: the complete supplied 2.2.0 source tarball, the original resctl-bench.zip,
-and the user's `CARGO_TARGET_DIR` error. Upstream implementation and dependency
-lock are unchanged. The driver no longer rejects inherited build overrides;
-it applies project-local settings in child processes only.
+```text
+bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b
+Cargo.lock SHA-256:
+fff9f4c6aed12b24be9533907308943b06027e534f8e9466dccd2904831d23a7
+```
 
-Official Cargo/Rustup semantics checked for this correction:
+The ZIP carried the original 163-entry working-file manifest and upstream Git
+objects, but only three upstream working files were present. All other 160 were
+restored from that same HEAD with recorded modes and checked against the original
+manifest before changes. `source-preservation.json` records archive identity,
+counts, original lock and the actual changed paths. `patches/base-source-manifest.json`
+retains all original file hashes. The patched source manifest covers all 163
+working files; nothing is replaced by a stub implementation.
 
-- Cargo configuration precedence, target-dir aliases, separate build-dir,
-  compiler wrappers and encoded flag priority:
-  https://doc.rust-lang.org/cargo/reference/config.html
-- Cargo environment variables:
-  https://doc.rust-lang.org/cargo/reference/environment-variables.html
-- Rustup automatic-install control:
-  https://rust-lang.github.io/rustup/environment-variables.html
+The workspace includes rd-agent, rd-hashd, resctl-bench, resctl-demo, their
+interface and utility crates, Cargo files, job documentation, tests/assets and
+licenses. `patches/0001-embedded-runtime-compat.patch` contains the complete
+native delta. Native benchmark/protection/coefficient algorithms and result
+schema are not changed. The helper C measurement body is separately hashed in
+compat/runtime-contract.json and is identical to the supplied original.
 
-See VALIDATION.md and cargo-target-regression.json for executed checks and
-explicit limitations. The documentation review is not a real upstream build.
+A minimal genuine upstream .git object store, index and HEAD are included so
+build-time version reporting refers to the real supplied commit. Local source
+changes remain truthfully dirty. User Git config, hooks, reflogs, local build
+caches, prior compiler paths, private output logs and uploaded binary archives
+are not included. Root build-kit .git data is not distributed. No SHA/version
+impersonation or synthetic clean commit is used.
 
+The build-kit version is 2.3.0. The patched upstream package version remains
+2.2.6. These are deliberately different version scopes. Old changelog entries
+are historical documentation, not proof of current compilation.
 
-## 2.2.0 host-Rust correction - 2026-09-16
+This is a complete **project source** snapshot, not an offline mirror of crates.io.
+The uploaded ZIP did not contain all third-party Cargo crate sources; they have
+not been invented or represented as vendored here. Use a populated host Cargo
+cache or normal access to the locked dependency sources. `make vendor`/
+`make source-dist` can populate a relocatable offline dependency bundle on the
+build host. Dependencies retain their individual licenses and resolved metadata.
 
-The primary task inputs are the supplied resctl-bench.zip build kit plus upstream
-source snapshot and resctl-bench.txt failure log. The log shows a dated Rustup
-installation followed by rejection of an existing CARGO_HOME/config.toml.
-The upstream source is preserved, not replaced with a newly fetched revision.
+The build kit remains independent of Meta/Facebook and BCC. Original copyright
+and license notices are retained. See NOTICE.md and upstream/LICENSE. Source
+hashes detect accidental or unreviewed changes; they are not digital signatures.
 
-Official documentation checked for this correction:
+External interface references used in this repair:
 
-- Rustup automatic-install environment switch and inherited selection:
-  https://rust-lang.github.io/rustup/environment-variables.html
-- Rustup selection/override precedence:
-  https://rust-lang.github.io/rustup/overrides.html
-- Cargo configuration search/precedence:
-  https://doc.rust-lang.org/cargo/reference/config.html
-- Cargo executable and cache environment variables:
-  https://doc.rust-lang.org/cargo/reference/environment-variables.html
-- Cargo vendoring and --respect-source-config:
-  https://doc.rust-lang.org/cargo/commands/cargo-vendor.html
-- Git optional index refresh control for source verification:
-  https://git-scm.com/docs/git-status
+- BCC kernel compiler options: https://raw.githubusercontent.com/iovisor/bcc/master/src/cc/frontends/clang/kbuild_helper.cc
+- findmnt JSON, explicit target and nofsroot: https://man7.org/linux/man-pages/man8/findmnt.8.html
+- Cargo build script/source rebuild behavior: https://doc.rust-lang.org/cargo/reference/build-scripts.html
 
-RUSTUP_AUTO_INSTALL=0 disables implicit installation; RUSTC/RUSTDOC select the
-concrete executables for Cargo. Configuration is read by Cargo, never rewritten
-by the build kit. Compiler executables and configured tools/build scripts remain
-trusted local programs, not isolated adversarial code.
-
-## Historical references supplied with 2.1.0
-
-The following reference list is retained from the original archive. Its claims
-of prior review are historical and were not all independently revalidated for
-this correction. In particular, no current nightly release or CI action release
-identity is asserted by this edition; the kit no longer resolves/install Rust.
-
-### Original reference list
-
-Review date: 2026-09-15. These references establish upstream interfaces and
-published documentation, not successful compilation in this authoring sandbox.
-Package and channel versions are intentionally resolved on the user's host;
-no fixed GCC, LLVM, nightly date or upstream SHA is advertised as permanently
-newest. The live nightly manifest could not be downloaded in this sandbox.
-
-## Debian
-
-- Forky release status: https://www.debian.org/releases/forky/
-- Testing release notes: https://www.debian.org/releases/testing/release-notes/
-- APT transaction controls: https://manpages.debian.org/testing/apt/apt-get.8.en.html
-- GCC metapackage: https://packages.debian.org/forky/gcc
-- Clang metapackage: https://packages.debian.org/forky/clang
-- pkgconf: https://packages.debian.org/forky/pkgconf
-- Python BCC package: https://packages.debian.org/forky/python3-bpfcc
-- oomd package: https://packages.debian.org/forky/oomd
-- fio package: https://packages.debian.org/forky/fio
-
-Package web pages can be cached and are not an APT-resolution authority. The
-code uses local refreshed indexes and recorded Release origin/codename instead.
-
-## Upstream resctl-demo
-
-- Repository: https://github.com/facebookexperimental/resctl-demo
-- Workspace manifest: https://raw.githubusercontent.com/facebookexperimental/resctl-demo/main/Cargo.toml
-- README: https://raw.githubusercontent.com/facebookexperimental/resctl-demo/main/README.md
-- Benchmark manifest: https://raw.githubusercontent.com/facebookexperimental/resctl-demo/main/resctl-bench/Cargo.toml
-- Agent manifest: https://raw.githubusercontent.com/facebookexperimental/resctl-demo/main/rd-agent/Cargo.toml
-- Hashd manifest: https://raw.githubusercontent.com/facebookexperimental/resctl-demo/main/rd-hashd/Cargo.toml
-- Interactive demo: https://raw.githubusercontent.com/facebookexperimental/resctl-demo/main/resctl-demo/Cargo.toml
-- Utility manifest/build identity: https://raw.githubusercontent.com/facebookexperimental/resctl-demo/main/rd-util/Cargo.toml
-- Build script: https://raw.githubusercontent.com/facebookexperimental/resctl-demo/main/rd-util/build.rs
-
-The reviewed manifest declares optional AWS Lambda functionality; it is not
-enabled for local benchmarking. The demo selects the termion backend, not a
-mandatory ncurses dependency. The utility build script uses actual Git metadata.
-The repository's old runtime/kernel examples are context, not fixed current
-Forky versions to install. Build artifacts capture docs from the fetched commit.
-
-## Rust and Linux
-
-- Rustup updates: https://rust-lang.github.io/rustup/basics.html
-- Minimal profile: https://rust-lang.github.io/rustup/concepts/profiles.html
-- Toolchain selection: https://rust-lang.github.io/rustup/overrides.html
-- Cargo update semantics: https://doc.rust-lang.org/cargo/commands/cargo-update.html
-- Cargo build: https://doc.rust-lang.org/cargo/commands/cargo-build.html
-- Cargo profiles: https://doc.rust-lang.org/cargo/reference/profiles.html
-- Cargo vendor: https://doc.rust-lang.org/cargo/commands/cargo-vendor.html
-- Compiler flags: https://doc.rust-lang.org/rustc/codegen-options/
-- Linux cgroup-v2/IOCost: https://docs.kernel.org/admin-guide/cgroup-v2.html
-
-## CI dependencies
-
-Official action releases reviewed for the provided workflow:
-
-- https://github.com/actions/checkout/releases/tag/v7.0.1
-  Commit 3d3c42e5aac5ba805825da76410c181273ba90b1.
-- https://github.com/actions/upload-artifact/releases/tag/v7.0.1
-  Commit 043fb46d1a93c77aae656e7c1c64a875d1fc6a0a.
-
-The actions are immutable-pinned and Dependabot checks daily; it proposes
-updates rather than silently merging them. CI uses the moving debian:forky
-container tag deliberately. Container/action execution has not been run here.
-
-## 2.1.0 import/entrypoint fix
-
-Python documents that -P/PYTHONSAFEPATH omits the script directory from the
-import path, while -I also ignores PYTHON environment settings. The driver
-therefore loads its bundled helpers by absolute file location rather than
-requiring users to disable these settings.
-
-https://docs.python.org/3/using/cmdline.html#cmdoption-P
-https://docs.python.org/3/using/cmdline.html#cmdoption-I
-https://docs.python.org/3/library/importlib.html#importing-a-source-file-directly
-
-The original failure is reproducible when safe-path mode omits scripts/ from
-sys.path. Its exact trigger on the reported host is not established from the
-traceback alone. The replacement also handles a genuinely missing helper with
-a precise incomplete-extraction error; it never substitutes a pip package.
+Runtime evidence is drawn from the supplied output archive. The redistribution
+includes a redacted analytic description, not the user's private archive or
+verbatim journals with host identifiers.

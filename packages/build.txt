@@ -1,5 +1,5 @@
 # Unversioned names are resolved to exact newest versions from your Forky indexes.
-# Do not install Debian's rustc/cargo: use the existing rustup installation.
+# Rust is supplied by the host (distro-native or an existing rustup toolchain).
 build-essential
 gcc
 g++
