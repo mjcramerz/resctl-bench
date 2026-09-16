@@ -1,0 +1,9 @@
+{
+  "cargo_lock_sha256": "fff9f4c6aed12b24be9533907308943b06027e534f8e9466dccd2904831d23a7",
+  "commit": "bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b",
+  "commit_epoch": 1782934368,
+  "requested_ref": "main",
+  "schema": 1,
+  "source_manifest_sha256": "b18d09430f157b43c77393109558a52709c42455b6404c2251adc830aac30c92",
+  "url": "https://github.com/facebookexperimental/resctl-demo.git"
+}
