@@ -2,7 +2,7 @@
   "configuration": "config.mk contains shipped defaults, not the source host's overrides",
   "contains_compiled_binaries": false,
   "kind": "complete-project-source-snapshot",
-  "kit_version": "2.3.0",
+  "kit_version": "2.3.1",
   "rust_policy": "host-installed-only",
   "schema": 1,
   "source_commit": "bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b",

@@ -1,6 +1,11 @@
 .work/
 dist/
+# Populated source checkout is also preserved in a tracked offline archive.
+# A Git checkout of the kit restores upstream/ from source-cache automatically.
 upstream/
+!source-cache/
+!source-cache/upstream.tar.gz
+source-recovery-backups/
 vendor/
 .buildkit.lock
 __pycache__/

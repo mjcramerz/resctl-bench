@@ -1,4 +1,11 @@
-# Build guide - repaired native source, build kit 2.3.0
+# Source availability note for 2.3.1
+
+Build using `./BUILD.sh package verify`. The source under `upstream/` and a
+hash-locked recovery archive are both included. Missing source is reconstructed
+automatically and offline; `make fetch verify-source` checks this without Rust.
+The original edited tree is never discarded. See SOURCE-RECOVERY.md.
+
+# Build guide - repaired native source, build kit 2.3.1
 
 ## Mandatory native repair gates
 
@@ -250,7 +257,7 @@ output. Default binaries are resctl-bench, rd-agent, rd-hashd, resctl-demo.
 | --- | --- |
 | help / all | Show available operations / alias package. |
 | deps / deps-plan / deps-runtime / deps-llvm | Install build dependencies / simulate / install runtime / optional LLVM. |
-| fetch / update-source | Fetch once at requested ref / deliberately move the source lock. |
+| fetch / verify-source / restore-source | Verify or recover reviewed local source / read-only integrity check / explicit safe recovery. |
 | update-toolchain / update-rustup / lock-toolchain | Disabled / disabled / record host identity locally. |
 | update-deps / fetch-deps | Refresh compatible dependency overlay / fetch locked dependencies. |
 | versions / doctor | Print provenance / probe compiler and linker. |
@@ -258,7 +265,7 @@ output. Default binaries are resctl-bench, rd-agent, rd-hashd, resctl-demo.
 | test-runtime | Compile and execute the 18 isolated native repair tests; no hardware workload. |
 | build / check / test-compile | Release binary build / check / compile tests without running. |
 | smoke / stage / rebuild / verify | CLI checks / stage payload / package selected inputs / verify latest result. |
-| vendor / source-dist / kit-dist | Vendor locked crates / vendored source archive / build-kit-only archive. |
+| vendor / source-dist / kit-dist | Vendor locked crates / vendored source archive / complete source snapshot for this patched release. |
 | snapshot-dist | Complete selected source snapshot without needing Rust or vendoring. |
 | lint / test | Syntax/whitespace checks / orchestration fixture tests. |
 | runtime-check | Read-only inventory, optional SCRATCH existing directory. |
@@ -272,7 +279,7 @@ Make goals are serialized. A project-level advisory lock serializes drivers.
 
 ## Release/source distributions and installation
 
-The delivered host-rust snapshot is produced by `make snapshot-dist`: it includes
+The delivered complete snapshot is produced by `make snapshot-dist`: it includes
 all supplied upstream source files and the modified build kit, a real minimal
 Git object store and source locks. It does not need Rust/network to create.
 It includes a vendor/dependency-lock tree only when already present and verified.
@@ -309,8 +316,8 @@ HOST_CC and a custom UPSTREAM_URL when rebuilding. Local config.mk is not
 bundled because it is trusted executable configuration that may contain private
 settings; record reviewed values separately. A source archive identity includes
 source, effective dependency lock and compiler lock to distinguish refreshes
-at the same Git SHA. The download called
-kit-dist is intentionally different: it has no upstream/vendor snapshots.
+at the same Git SHA. For this reviewed patched release, kit-dist is an alias for
+the complete snapshot-dist; it no longer creates a source-less kit.
 
 Packaging sorts entries and normalizes owner, group, file modes and archive
 mtime. SOURCE_DATE_EPOCH defaults to the source commit time. This gives a

@@ -58,15 +58,16 @@ def _load_helper(name: str) -> Any:
 debian = _load_helper("debian")
 host_rust = _load_helper("host_rust")
 runtime_support = _load_helper("runtime_support")
+source_archive = _load_helper("source_archive")
 
-VERSION = "2.3.0"
+VERSION = "2.3.1"
 ROOT = Path(__file__).resolve().parents[1]
 GIB = 1024**3
 BASE_BINS = ("resctl-bench", "rd-agent", "rd-hashd")
 KIT_ITEMS = ("Makefile", "README.md", "LICENSE", "NOTICE.md", ".gitignore",
              ".editorconfig", "config.mk.example", "scripts", "tests", "docs",
-             "packages", ".github", "CHANGELOG.md", "compat", "patches", "RUN-IOCOST-LAB.sh")
-HELP = """resctl-bench-buildkit 2.3.0 (Debian Forky, native amd64/arm64 GNU/Linux)
+             "packages", ".github", "CHANGELOG.md", "compat", "patches", "RUN-IOCOST-LAB.sh", "BUILD.sh")
+HELP = """resctl-bench-buildkit 2.3.1 (Debian Forky, native amd64/arm64 GNU/Linux)
 
   make                  Same as make package (host Rust; locked source)
   make package          Build locked sources with host Rust; no APT or toolchain changes
@@ -81,7 +82,9 @@ HELP = """resctl-bench-buildkit 2.3.0 (Debian Forky, native amd64/arm64 GNU/Linu
   make update-deps      Resolve newest compatible crates into a separate, audited lock
   make versions         Show source/toolchain/dependency locks and local package versions
   make doctor           Validate installed compiler, host, tools and flags
-  make fetch            Fetch once; lock Git commit and all source file hashes
+  make fetch            Verify/restore complete bundled source; no network for this release
+  make verify-source    Read-only verification of patched source and recovery archive
+  make restore-source   Restore absent/incomplete source offline; never overwrite edits
   make update-source    Blocked while a reviewed native source patch is selected
   make lock-toolchain   Record current host compiler identity (project-local metadata)
   make fetch-deps       Download dependencies without changing Cargo.lock
@@ -97,7 +100,7 @@ HELP = """resctl-bench-buildkit 2.3.0 (Debian Forky, native amd64/arm64 GNU/Linu
   make vendor           Vendor the entire locked Cargo dependency graph
   make source-dist      Bundle this kit + locked upstream + vendored crates
   make snapshot-dist    Bundle complete selected source; no Rust/network required
-  make kit-dist         Bundle build-kit code only (no network or Rust needed)
+  make kit-dist         For this patched release: same complete source as snapshot-dist
   make test             Run build-kit unit/integration tests (no Rust required)
   make lint             Check Python syntax and whitespace
   make runtime-check    Read-only host checks; optional SCRATCH=/mount/path
@@ -116,7 +119,7 @@ Configuration: config.mk.example or make VAR=value.
   CARGO_TARGET_DIR/build-dir overrides do not redirect project output from .work/
   PREFIX=/usr/local DESTDIR= FORCE=0
   UPSTREAM_URL=https://github.com/facebookexperimental/resctl-demo.git
-  UPSTREAM_REF=main (only initial fetch/update; then the full SHA is locked)
+  UPSTREAM_REF=main (ignored for the already locked bundled source)
 
 Build as your ordinary user. Never use make as a benchmark launcher.
 """
@@ -477,23 +480,29 @@ class Builder:
         return env
 
     def git(self, *args: str, cwd: Path | None = None) -> str:
-        return run(["git", "-c", "core.hooksPath=/dev/null", "-c", "core.autocrlf=false", *args],
+        return run(["git", "-c", "core.hooksPath=/dev/null", "-c", "core.autocrlf=false",
+                    "-c", "diff.autoRefreshIndex=false", *args],
                    cwd=cwd or self.src, env=self.environment(), timeout=300, quiet=True).strip()
 
-    def verify_source(self) -> dict[str, Any]:
+    def verify_source(self, source: Path | None = None) -> dict[str, Any]:
+        src = self.src if source is None else source
         lock = read_json(self.root / "source.lock.json")
         if not re.fullmatch(r"[0-9a-f]{40}", lock["commit"]):
             raise BuildError("Invalid locked Git commit")
         manifest_path = self.root / "source-manifest.json"
         if digest(manifest_path) != lock["source_manifest_sha256"]:
             raise BuildError("Source manifest was changed; refuse to build")
-        if not self.src.is_dir() or self.src.is_symlink():
+        if not src.is_dir() or src.is_symlink():
             raise BuildError("Missing/unsafe upstream source directory")
-        if file_manifest(self.src, exclude_git=True) != read_json(manifest_path):
+        if file_manifest(src, exclude_git=True) != read_json(manifest_path):
             raise BuildError("Upstream files differ from the source lock; preserve your edits and review them first")
-        if self.git("rev-parse", "HEAD") != lock["commit"]:
+        if not (src / ".git").is_dir() or (src / ".git").is_symlink():
+            raise BuildError("Missing/unsafe upstream Git identity; run make restore-source")
+        if Path(self.git("rev-parse", "--show-toplevel", cwd=src)).resolve() != src.resolve():
+            raise BuildError("Source Git identity points outside the source directory")
+        if self.git("rev-parse", "HEAD", cwd=src) != lock["commit"]:
             raise BuildError("Upstream HEAD does not match the locked commit")
-        changes = self.git("status", "--porcelain", "--untracked-files=all")
+        changes = self.git("status", "--porcelain", "--untracked-files=all", cwd=src)
         patchset = lock.get("patchset")
         if patchset:
             patch_file = self.root / safe_relative(patchset["path"])
@@ -501,7 +510,7 @@ class Builder:
                 raise BuildError("Reviewed source patch was changed")
             # HEAD stays at the real uploaded base commit. The native -dirty
             # version suffix truthfully identifies this reviewed local delta.
-            delta = self.git("diff", "--no-ext-diff", "--no-textconv", "--binary", "HEAD", "--", ".")
+            delta = self.git("diff", "--no-ext-diff", "--no-textconv", "--binary", "HEAD", "--", ".", cwd=src)
             if delta != patch_file.read_text().strip():
                 raise BuildError("Source changes differ from the reviewed native-runtime patch")
             base_manifest = self.root / safe_relative(patchset["base_manifest"])
@@ -510,12 +519,104 @@ class Builder:
             contract = self.root / safe_relative(patchset["runtime_contract"])
             if digest(contract) != patchset["runtime_contract_sha256"]:
                 raise BuildError("Runtime compatibility contract was changed")
-            runtime_support.validate_source(self.src, contract)
+            runtime_support.validate_source(src, contract)
         elif changes:
             raise BuildError("Upstream Git worktree is dirty")
-        if digest(self.src / "Cargo.lock") != lock["cargo_lock_sha256"]:
+        if digest(src / "Cargo.lock") != lock["cargo_lock_sha256"]:
             raise BuildError("Cargo.lock has changed")
         return lock
+
+    def restore_source(self) -> dict[str, Any]:
+        """Reconstruct only absent/unmodified source from the pinned local snapshot.
+
+        The old incomplete tree is retained outside .work/ (make clean must not
+        destroy it). Candidate validation happens before any working-tree rename.
+        A conflicting file is never silently discarded, even on explicit restore.
+        """
+        lock = read_json(self.root / "source.lock.json")
+        manifest_path = self.root / "source-manifest.json"
+        if digest(manifest_path) != lock["source_manifest_sha256"]:
+            raise BuildError("Source manifest was changed; recovery is not authorized")
+        expected = read_json(manifest_path)
+        if self.src.is_symlink() or (self.src.exists() and not self.src.is_dir()):
+            raise BuildError("Cannot restore an unsafe upstream path; no existing path was changed")
+        if self.src.exists():
+            gitdir = self.src / ".git"
+            if gitdir.is_symlink() or (gitdir.exists() and not gitdir.is_dir()):
+                raise BuildError("Cannot restore a symlinked/external .git; no files were changed")
+            current = file_manifest(self.src, exclude_git=True)
+            conflicts = sorted(name for name, value in current.items() if expected.get(name) != value)
+            if conflicts:
+                raise BuildError("Source recovery would overwrite local changes or untracked files: "
+                                 + ", ".join(conflicts[:8]) + ". Preserve/review these files first; "
+                                 "nothing was overwritten.")
+        else:
+            current = {}
+        if current == expected:
+            try:
+                return self.verify_source()
+            except (BuildError, OSError):
+                # Exact working files with missing/corrupt local Git metadata
+                # are recoverable, without resetting or deleting user edits.
+                pass
+        archive = source_archive.validate_cache(self.root, lock.get("recovery"))
+        print("Restoring reviewed source OFFLINE from " + str(archive), file=sys.stderr)
+        self.work.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="source-restore-", dir=self.work) as temp:
+            prepared = source_archive.unpack(archive, Path(temp))
+            self.verify_source(source=prepared)
+            backup = None
+            if self.src.exists():
+                backups = self.root / "source-recovery-backups"
+                if backups.is_symlink():
+                    raise BuildError("Refuse a symlinked source-recovery-backups directory")
+                backups.mkdir(exist_ok=True)
+                backup = Path(tempfile.mkdtemp(prefix="recovered-", dir=backups)) / "upstream"
+                self.src.rename(backup)
+            try:
+                prepared.rename(self.src)
+            except BaseException:
+                if backup is not None and not self.src.exists():
+                    backup.rename(self.src)
+                raise
+            result = self.verify_source()
+            write_json(self.work / "source-recovery.json", {
+                "schema": 1, "network_used": False, "source_commit": lock["commit"],
+                "source_manifest_sha256": lock["source_manifest_sha256"],
+                "recovery_sha256": lock["recovery"]["sha256"],
+                "retained_previous_tree": str(backup) if backup else None,
+                "restored_files": len(expected), "verified": True})
+            print("Verified complete patched source: " + str(self.src), file=sys.stderr)
+            if backup is not None:
+                print("Previous incomplete tree retained: " + str(backup), file=sys.stderr)
+            return result
+
+    def create_recovery_archive(self) -> None:
+        """Maintainer operation: seed a recovery asset from already verified source."""
+        lock = self.verify_source()
+        if lock.get("recovery"):
+            source_archive.validate_cache(self.root, lock["recovery"])
+            return
+        target = self.root / "source-cache" / "upstream.tar.gz"
+        if target.parent.is_symlink() or target.exists() or target.is_symlink():
+            raise BuildError("Refuse to overwrite an unregistered source recovery archive")
+        target.parent.mkdir(exist_ok=True)
+        self.work.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="seed-source-", dir=self.work) as temp:
+            tree = Path(temp) / "upstream"
+            self.copy_source(tree)
+            make_archive(tree, target, lock["commit_epoch"])
+        lock["recovery"] = {"schema": 1, "format": "complete-source-tar-gzip",
+                            "path": "source-cache/upstream.tar.gz", "sha256": digest(target)}
+        write_json(self.root / "source.lock.json", lock)
+
+    def copy_recovery_archive(self, destination: Path) -> None:
+        lock = read_json(self.root / "source.lock.json")
+        if lock.get("recovery"):
+            archive = source_archive.validate_cache(self.root, lock["recovery"])
+            target = destination / safe_relative(lock["recovery"]["path"])
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(archive, target)
 
     def fetch(self, update: bool = False) -> dict[str, Any]:
         locked = (self.root / "source.lock.json").exists()
@@ -524,9 +625,12 @@ class Builder:
                 raise BuildError("This source release carries a reviewed native compatibility patch. "
                                  "update-source/latest is blocked so it cannot silently remove the fix. "
                                  "Rebase and revalidate the patch explicitly; see docs/NATIVE-REPAIR.md.")
-            if not self.src.is_dir():
-                raise BuildError("Patched source tree is missing. Re-extract the complete source tarball; "
-                                 "the base remote commit alone does not contain the repair.")
+            if read_json(self.root / "source.lock.json").get("recovery"):
+                self.restore_source()
+            elif not self.src.is_dir():
+                raise BuildError("This older source lock has no offline recovery asset. "
+                                 "Use the complete 2.3.1+ source repository; "
+                                 "an unpatched remote checkout is never a fallback.")
         if locked and self.src.exists():
             current = self.verify_source()
             if not update:
@@ -644,9 +748,21 @@ class Builder:
             candidates.update((parent / ".cargo/config", parent / ".cargo/config.toml"))
         return {str(p): digest(p) for p in sorted(candidates) if p.is_file()}
 
-    def copy_source(self, destination: Path) -> None:
-        """Copy actual source and a minimal Git identity; never fabricate a commit."""
-        self.verify_source()
+    def copy_source(self, destination: Path, *, stable_metadata: bool = False) -> None:
+        """Copy actual source and a minimal Git identity; never fabricate a commit.
+
+        A release snapshot uses the recovery asset's exact Git metadata too.
+        Copying a refreshed mutable index from the build worktree would make
+        SHA256SUMS differ after an otherwise correct offline recovery.
+        """
+        lock = self.verify_source()
+        if stable_metadata and lock.get("recovery"):
+            archive = source_archive.validate_cache(self.root, lock["recovery"])
+            with tempfile.TemporaryDirectory(prefix="source-copy-", dir=destination.parent) as temp:
+                prepared = source_archive.unpack(archive, Path(temp))
+                self.verify_source(source=prepared)
+                prepared.rename(destination)
+            return
         shutil.copytree(self.src, destination, symlinks=True, ignore=shutil.ignore_patterns(".git"))
         gitdir = destination / ".git"
         gitdir.mkdir()
@@ -819,8 +935,8 @@ class Builder:
 
     def cargo_context(self) -> tuple[dict[str, str], dict[str, Any]]:
         self.assert_build_user()
-        tools = self.tools()
         lock = self.fetch()
+        tools = self.tools()
         active_source = self.effective_source()
         rust, c, cxx = compilation_flags(self.cfg, tools["host"], self.root, self.cargo_home)
         env = self.environment()
@@ -901,6 +1017,8 @@ class Builder:
 
     def doctor(self) -> None:
         self.assert_build_user()
+        if (self.root / "source.lock.json").exists():
+            self.fetch()
         tools = self.tools()
         rust, c, cxx = compilation_flags(self.cfg, tools["host"], self.root, self.cargo_home)
         env = self.environment()
@@ -1170,6 +1288,7 @@ class Builder:
         for p in (destination / "scripts").glob("*.py"):
             p.chmod(0o755)
         (destination / "RUN-IOCOST-LAB.sh").chmod(0o755)
+        (destination / "BUILD.sh").chmod(0o755)
         # Archive completeness gate: isolated Python ignores PYTHONPATH and the
         # scripts directory, precisely the environment the old imports broke in.
         for action in ("help", "lint"):
@@ -1180,22 +1299,26 @@ class Builder:
     def snapshot_dist(self) -> Path:
         """Archive all selected project sources without Rust, downloads or vendoring.
 
-        Unlike kit-dist this includes the complete locked upstream implementation.
+        Always includes the complete locked source and its recovery asset.
         Unlike source-dist it does not require Cargo or promise offline crates.
         """
-        lock = self.verify_source()
+        lock = self.fetch()
+        if lock.get("patchset") and not lock.get("recovery"):
+            self.create_recovery_archive()
+            lock = self.verify_source()
         if self.dependency_dir.exists():
             self.verify_dependency_lock()
         if self.vendor_dir.exists():
             self.verify_vendor()
-        name = f"resctl-bench-buildkit-{VERSION}-host-rust"
+        name = "resctl-bench"
         self.work.mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(prefix="snapshot-dist-", dir=self.work) as temp:
             tree = Path(temp) / name
             self.copy_kit(tree)
             # Ship reviewed defaults, never a user's executable/private Make config.
             shutil.copyfile(tree / "config.mk.example", tree / "config.mk")
-            self.copy_source(tree / "upstream")
+            self.copy_source(tree / "upstream", stable_metadata=True)
+            self.copy_recovery_archive(tree)
             for filename in ("source.lock.json", "source-manifest.json"):
                 shutil.copyfile(self.root / filename, tree / filename)
             for dirname in ("dependency-lock", "vendor"):
@@ -1211,12 +1334,16 @@ class Builder:
             Builder(tree, self.cfg).verify_source()
             checksums(tree)
             epoch = int(os.environ.get("SOURCE_DATE_EPOCH", lock["commit_epoch"]))
-            destination = self.dist / (name + ".tar.gz")
+            destination = self.dist / (f"resctl-bench-2.2.6-complete-source-{VERSION}.tar.gz")
             make_archive(tree, destination, epoch)
         print(destination)
         return destination
 
     def source_dist(self, kit_only: bool = False) -> Path:
+        if (kit_only and (self.root / "source.lock.json").exists()
+                and read_json(self.root / "source.lock.json").get("patchset")):
+            print("kit-dist includes COMPLETE source for this patched release.", file=sys.stderr)
+            return self.snapshot_dist()
         lock = None
         if not kit_only:
             self.fetch()
@@ -1240,7 +1367,8 @@ class Builder:
                 for filename in ("source.lock.json", "source-manifest.json", "toolchain.lock.json"):
                     shutil.copyfile(self.root / filename, tree / filename)
                 shutil.copytree(self.vendor_dir, tree / "vendor")
-                self.copy_source(tree / "upstream")
+                self.copy_source(tree / "upstream", stable_metadata=True)
+                self.copy_recovery_archive(tree)
                 if self.dependency_dir.exists():
                     shutil.copytree(self.dependency_dir, tree / "dependency-lock")
                 for filename in ("latest-resolution.json",):
@@ -1337,7 +1465,15 @@ def main() -> int:
         elif action == "doctor":
             builder.doctor()
         elif action in ("fetch", "update-source"):
-            builder.fetch(update=action == "update-source")
+            lock = builder.fetch(update=action == "update-source")
+            print("Verified source: " + str(builder.src) + " (" + lock["commit"] + ")")
+        elif action == "restore-source":
+            builder.restore_source()
+        elif action == "verify-source":
+            lock = builder.verify_source()
+            if lock.get("recovery"):
+                source_archive.validate_cache(ROOT, lock["recovery"])
+            print("Verified complete patched source, Cargo.lock and offline recovery archive")
         elif action == "lock-toolchain":
             builder.tools(refresh=True)
             print("Installed compiler explicitly accepted in toolchain.lock.json")
@@ -1399,7 +1535,7 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except (BuildError, debian.DebianError, host_rust.HostRustError, runtime_support.SupportError, OSError, ValueError, KeyError) as exc:
+    except (BuildError, debian.DebianError, host_rust.HostRustError, runtime_support.SupportError, source_archive.SourceArchiveError, OSError, ValueError, KeyError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         if os.environ.get("BUILDKIT_TRACEBACK") == "1":
             raise

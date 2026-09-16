@@ -11,6 +11,12 @@
     "runtime_contract_sha256": "5c1c56efe920d2914afb26a4a662892176ebc75b493d8bb8048f8109c6fd3ccc",
     "sha256": "ae1b15320b8b94fa4adf0043c145fd261c6040431637898df0212bbabaa571bc"
   },
+  "recovery": {
+    "format": "complete-source-tar-gzip",
+    "path": "source-cache/upstream.tar.gz",
+    "schema": 1,
+    "sha256": "968c0e4cbf446360bde5de914cf1c07885fc75cebb9387d747fd635560a8ae7d"
+  },
   "requested_ref": "main",
   "schema": 2,
   "source_manifest_sha256": "7b8a2a0b3d211065d1620690594aa0ea3f73e6912185c1ddb4e58d940d79a99c",

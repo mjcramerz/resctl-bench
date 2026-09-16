@@ -21,16 +21,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # supplied pinned action; not exercised during local validation
         with:
           persist-credentials: false
-      - run: make lint test
+      - run: make fetch verify-source lint test
       - name: Validate the actual distributed entrypoints after extraction
         shell: bash
         run: |
           make snapshot-dist
           mkdir /tmp/kit-release-check
-          tar -xzf dist/resctl-bench-buildkit-2.3.0-host-rust.tar.gz -C /tmp/kit-release-check
-          cd /tmp/kit-release-check/resctl-bench-buildkit-2.3.0-host-rust
+          tar -xzf dist/resctl-bench-2.2.6-complete-source-2.3.1.tar.gz -C /tmp/kit-release-check
+          cd /tmp/kit-release-check/resctl-bench
           sha256sum -c SHA256SUMS
-          PYTHONSAFEPATH=1 make help lint test
+          PYTHONSAFEPATH=1 make help fetch verify-source lint test
   real-upstream:
     if: github.event_name == 'workflow_dispatch' && inputs.upstream_build
     # Administrators provide this runner with Rust and Debian dependencies.

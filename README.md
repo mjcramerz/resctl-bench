@@ -1,4 +1,4 @@
-# resctl-bench complete source release - build kit 2.3.0
+# resctl-bench complete source release - build kit 2.3.1
 
 This is the complete supplied resctl workspace, with a reviewed **native source
 repair**, not another IOCost Lab wrapper or a substitute benchmark. The upstream
@@ -7,7 +7,27 @@ package version remains 2.2.6. The base commit is
 in `patches/` and `source.lock.json` and the native version retains its honest
 `-dirty` suffix.
 
-## What failed and what changed
+## Fix for "Patched source tree is missing"
+
+The previous build driver rejected a missing `upstream/` directory instead of
+restoring the reviewed source. That was a build-system defect, not a Rust
+compiler diagnostic. This archive includes **both the complete patched source
+and a hash-pinned local recovery copy**. A normal build automatically restores
+absent/incomplete source without contacting upstream and without dropping the
+native repair. Existing edited/untracked files are never overwritten.
+
+```sh
+./BUILD.sh fetch verify-source
+./BUILD.sh package verify
+```
+
+Run these as your ordinary user. `BUILD.sh` works from another directory too;
+source, scripts, config.mk and build output stay anchored to this repository.
+`upstream/Cargo.toml` is the actual complete Rust workspace, not a placeholder.
+See **docs/SOURCE-RECOVERY.md** for recovery behavior, retained backups, integrity
+checks and the distinction between bundled source and third-party Cargo crates.
+
+## Native repairs retained unchanged
 
 The supplied output records a successful patched latency probe, then
 `resctl-bench` starts `rd-agent --reset`. Reset deletes `work/misc-bin/` and the
@@ -36,9 +56,9 @@ From the extracted source directory:
 
 ```sh
 sha256sum -c SHA256SUMS
-make doctor
-make package
-make verify
+./BUILD.sh fetch verify-source
+./BUILD.sh doctor
+./BUILD.sh package verify
 ```
 
 Do **not** run compilation with sudo. The default is the installed host Rust,
@@ -96,43 +116,38 @@ vendored crates. `OFFLINE=1` requires those dependencies already available.
 this patched release so they cannot silently discard the repair. Rebase and
 revalidate a future source update explicitly.
 
-## Actually use the new build with IOCost Lab
+## Install and use with IOCost Lab 2.x
 
-**Running the old Lab menu without selecting the new runtime will still use its
-old bundled binaries.** The included executable bridge prevents that mistake.
-After the successful build above, as root for the benchmark only:
+After `./BUILD.sh package verify` succeeds, install the actual new binaries:
 
 ```sh
-sudo ./RUN-IOCOST-LAB.sh --lab /absolute/path/to/iocost-lab
+sudo ./BUILD.sh install
 ```
 
-It checks the staged package, contract and actual embedded helper bytes, then
-shows full report / full report and install / preflight actions. It passes the
-new runtime through the Lab's existing `--runtime-dir`; it never silently falls
-back to the old archive. The existing IOCost Lab 1.5.0 maintenance plan, device
-selection, reports and recovery stay in control. There is no scratch prompt.
-`--lab` identifies your existing Lab code directory, not a workload directory.
-
-To verify the handoff without launching anything:
-
-```sh
-./RUN-IOCOST-LAB.sh --lab /absolute/path/to/iocost-lab --action full --plan
-```
-
-The bridge preserves the directory from which it is invoked. **Launch on the
-disk you intend to calibrate** because IOCost Lab writes `output/`, including
-its workload files, below that directory. A USB repository or USB boot is not
-required. The source/build tree may be elsewhere:
+IOCost Lab 2.x uses the installed `resctl-bench`, `rd-agent` and `rd-hashd` on
+PATH. Launch the Lab normally from a directory on the selected disk:
 
 ```sh
 cd /existing/directory/on/the/selected/disk
-sudo /absolute/path/to/this-source/RUN-IOCOST-LAB.sh --lab /absolute/path/to/iocost-lab
+sudo /absolute/path/to/iocost-lab/RUN.sh
 ```
 
-The default four linked full-mode stages remain `iocost-params`, `hashd-params`,
-`iocost-qos`, `iocost-tune`. Storage fio is an internal upstream coefficient
-calibration dependency, not a replacement entry point. Zram is not a calibration
-target; temporary swap handling remains the approved Lab maintenance operation.
+No runtime directory or scratch-directory prompt is needed. The Lab checks its
+own prerequisites, shows its maintenance plan, and handles workload/report
+placement and restoration. Output on the disk being calibrated is intentional;
+USB boot or a USB repository is not required.
+
+The optional `RUN-IOCOST-LAB.sh --lab /path/to/iocost-lab` bridge is retained. It
+uses help-only interface detection: Lab 1.5.x receives the verified package via
+`--runtime-dir`; Lab 2.x receives the matching root-owned installed directory
+via `--bin-dir`. It never supplies the removed legacy option to Lab 2.x or falls
+back to old binaries. For Lab 2.x, install first: a user-owned build stage is not
+an installed runtime. `--action full --plan` verifies/prints without launching.
+
+The four native full-mode stages remain `iocost-params`, `hashd-params`,
+`iocost-qos`, and `iocost-tune`. Storage fio remains an internal coefficient
+calibration dependency, not a replacement benchmark entry point. Temporary
+swap handling remains the Lab's approved maintenance operation.
 
 ## Runtime verification without a workload
 
@@ -158,7 +173,7 @@ maintenance operation with filesystem trim and potential data-loss risks.
 
 ## Source completeness and validation
 
-All 163 upstream working-tree files are present. The ZIP's missing 160 files
+All 163 upstream working-tree files are present, both directly and in the offline recovery archive. The ZIP's missing 160 files
 were recovered from its own Git objects and checked against its original
 manifest before applying the repair. Original notices and licenses are retained.
 Only the reviewed files recorded in the patch differ from the base. No uploaded

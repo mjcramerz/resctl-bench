@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "kit_version": "2.3.0",
+  "kit_version": "2.3.1",
   "source_commit": "bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b",
   "uploaded_source_zip_sha256": "e2cb9fcc0d4a74f808061d241526c8f3ad3c5f2e243add3ed7611127053f55ce",
   "upstream_file_count": 163,
@@ -191,5 +191,8 @@
     "prior compiled binaries",
     ".work",
     "toolchain.lock.json from the uploaded host"
-  ]
+  ],
+  "all_163_native_source_files_unchanged_from_repaired_2_3_0": true,
+  "cargo_lock_unchanged_from_repaired_2_3_0": true,
+  "native_patch_unchanged": true
 }

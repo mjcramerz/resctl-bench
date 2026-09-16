@@ -1,3 +1,16 @@
+# 2.3.1 - complete offline-recoverable source repository
+
+- Ship all 163 patched working files plus a hash-pinned local source/Git snapshot.
+- Restore missing/partial source or lost Git metadata before builds, without
+  network access or falling back to unpatched upstream; retain incomplete trees
+  and refuse to overwrite edits/untracked files.
+- Anchor BUILD.sh and Makefile entrypoints/config to the repository location.
+- Make kit-dist include the complete source for this reviewed patchset.
+- Update extraction/CI paths and restore source before source-contract tests.
+- Detect Lab 1.5.x versus 2.x interfaces; require the installed matching runtime
+  for Lab 2.x instead of passing its removed --runtime-dir option.
+- Keep the full 2.3.0 native patch and Cargo.lock unchanged.
+
 # 2.3.0 - native source repair
 
 - Recovered 160 missing upstream working files from the uploaded Git objects;

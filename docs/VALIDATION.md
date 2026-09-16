@@ -1,11 +1,13 @@
-# Validation scope - source release 2.3.0
+# Validation scope - source release 2.3.1
 
 ## Performed in the delivery environment
 
-The actual results are in `test-results.txt` and `validation.json`. The complete
-Python/source/packaging suite is run in bounded batches because individual
-execution-tool calls have a wall-time cap. Records identify each unique test;
-interrupted partial batches are not counted as completed. The supplied Git
+The actual results are in `test-results.txt` and `validation.json`. All 204
+Python/source/build-system tests passed in one complete run, with zero failures,
+errors or skips. Interrupted development runs are not counted as completion.
+There are 32 real source-recovery/archive tests and 10 additional Lab interface
+tests. The latter use help-only shell fixtures and byte-identity fixtures, not
+storage workloads. The actual IOCost Lab 2.0.0 help was also queried successfully. The supplied Git
 objects restore the complete source, all original manifest hashes are checked,
 and the final archive is extracted and its manifest/provenance reverified.
 
@@ -63,3 +65,11 @@ A further explicitly requested target-host check, `runtime_support.py
 workload. Full benchmarking remains a separate approved maintenance operation
 through IOCost Lab. Its success, accurate measurements and safe restoration
 cannot be established from file exports, imports, compilation or fixture tests.
+
+## Post-archive checks
+
+The separate downloadable release-validation record reports fresh-extraction
+checksum verification, actual recovery after deleting the QA copy's upstream/
+directory, and fresh extracted unprivileged recovery/interface tests. These
+checks run against the finished artifact, not against a hand-populated source
+path. They do not add a claim of native Rust compilation.

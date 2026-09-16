@@ -31,7 +31,7 @@ caches, prior compiler paths, private output logs and uploaded binary archives
 are not included. Root build-kit .git data is not distributed. No SHA/version
 impersonation or synthetic clean commit is used.
 
-The build-kit version is 2.3.0. The patched upstream package version remains
+The build-kit version is 2.3.1. The patched upstream package version remains
 2.2.6. These are deliberately different version scopes. Old changelog entries
 are historical documentation, not proof of current compilation.
 
@@ -55,3 +55,8 @@ External interface references used in this repair:
 Runtime evidence is drawn from the supplied output archive. The redistribution
 includes a redacted analytic description, not the user's private archive or
 verbatim journals with host identifiers.
+
+The 2.3.1 build-system repair retains every patched source file and Cargo.lock
+from 2.3.0 unchanged. Its additional source-cache/upstream.tar.gz is a complete
+recovery copy, pinned by source.lock.json and copied into all complete source
+distributions. See SOURCE-RECOVERY.md.

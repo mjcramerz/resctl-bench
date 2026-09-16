@@ -110,6 +110,9 @@ in build provenance.
 
 ## Lab handoff and compatibility
 
+For IOCost Lab 2.x, install with `sudo ./BUILD.sh install` and run the Lab normally.
+The bridge detects Lab 2.x and verifies the installed binaries before using
+`--bin-dir`. The following describes its retained Lab 1.5.x path.
 Use `RUN-IOCOST-LAB.sh --lab /path/to/iocost-lab` after a successful build. The
 bridge verifies this build's stage and passes it explicitly as --runtime-dir.
 The old Lab's default vendor archive is not modified and is never the bridge's
