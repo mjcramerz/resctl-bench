@@ -14,38 +14,37 @@ run on Trixie, Bookworm or another distribution. `ALLOW_ROOT_BUILD=1` is solely
 an explicit disposable-container override. Normal builds must be unprivileged.
 Neither switch makes the host supported or establishes tested compatibility.
 
-## Latest resolution versus locked rebuilds
-
-The high-level commands are:
+## Host-only builds and explicit refreshes
 
 ```sh
-make package           # One command: setup, current inputs, compile and binary tarball.
+make doctor            # Probe already-installed host Rust/C/C++.
+make package           # Build locked source; no APT, Rust update or cargo update.
 make                   # Same as make package.
-make latest            # Compatibility alias for make package.
-make latest-complete   # Also vendor and produce the populated source tarball.
-make rebuild           # Rebuild/package selected inputs; no input updates.
+make latest            # Explicitly refresh main/crates using existing host Rust.
+make latest-complete   # Also vendor and produce a populated source tarball.
+make rebuild           # Same locked build/package behavior as package.
 make verify            # Check the last runtime archive and staged payload.
 ```
 
-`package` (unless OFFLINE=1), `latest`, and `latest-complete` require online operation, `UPSTREAM_REF=main`, and
-`TOOLCHAIN=nightly`. `UPSTREAM_URL` defaults to the official repository. A
-custom URL is a trusted-input choice, not a claim that it is official upstream.
-`UPSTREAM_REF` controls only first fetch and explicit `update-source`; after
-fetch the full SHA is authoritative. Changes to a locked checkout are rejected.
+`TOOLCHAIN=host` is the default for every build. `make package` uses the bundled
+source lock and Cargo.lock, and needs network only for uncached dependencies
+(or an initial source fetch in a kit-only extraction). `OFFLINE=1` forbids Cargo
+network access and requires existing sources and cached/vendored dependencies.
+`latest` and `latest-complete` require online operation and `UPSTREAM_REF=main`;
+they update source/dependencies, never Rust or APT packages. `UPSTREAM_URL`
+defaults to the official repository; a custom URL is a trusted-input choice.
+`UPSTREAM_REF` affects initial fetch or explicit source update. Afterwards the
+full locked SHA is authoritative and source changes are rejected.
 
-The newest path installs Forky build dependencies, refreshes source, resolves
-and installs the exact official nightly, refreshes compatible crates, runs
-compiler/linker probes, and builds/packages. `latest-complete` then vendors and
-creates the source distribution. The workflow is NOT a transactional rollback
-of all APT/rustup/Git side effects. Successful updates can remain after a later
-compile failure. Each package attempt clears the prior runtime success pointer and latest alias;
-only successful runtime publication creates a new one. A later source-archiving
-failure does not delete an already successful runtime package. Old artifacts
-are never silently presented as outputs of a failed new package attempt.
+Each package attempt clears the previous success pointer/latest alias. Only
+successful publication installs a new pointer. A later source-vendoring failure
+does not invalidate an already successful binary archive. A failed compilation
+does not silently retry with another compiler, unlocked dependencies or rewritten
+source code. No command changes a global Rust/Cargo/shell configuration.
 
 ### Forky APT policy
 
-`make deps` performs `apt-get update --error-on=any`, then examines APT's Release
+`make deps` is explicit system maintenance, never called by package/latest. It performs `apt-get update --error-on=any`, then examines APT's Release
 metadata and package versions. It accepts a `testing` source alias only while
 that index says `o=Debian,n=forky`; it rejects Sid and other release indexes.
 APT remains responsible for signature verification. Administrators must keep
@@ -73,8 +72,9 @@ password prompt cannot disappear into the log pipe. Only APT receives sudo.
 
 The default compiler drivers are `/usr/bin/gcc` and `/usr/bin/g++`, avoiding
 unreviewed alternatives such as a custom `cc` wrapper. `pkgconf`/`pkgconf-bin`
-provide pkg-config. The base Rust workspace does not require installing an old
-Debian rustc/cargo package, Python pip dependencies, ncurses, or all LLVM tools.
+provide pkg-config. The kit never installs Debian rustc/cargo packages or provisions Rustup. A
+suitable Rust/Cargo/rustdoc installation must already exist. The base workspace
+does not require Python pip dependencies, ncurses, or all LLVM tools.
 Optional `make deps-llvm` provisions Forky's clang/lld/llvm/libclang development
 stack. Select it deliberately with `HOST_CC=/usr/bin/clang
 HOST_CXX=/usr/bin/clang++`; there is no automatic GCC-to-Clang fallback.
@@ -84,43 +84,54 @@ or change distro services via Debian maintainer scripts. It is not a read-only
 check. Dependency transactions may install/upgrade required shared libraries;
 review the printed plan and use normal system-maintenance precautions.
 
-### Rust and rustup
+### Host Rust selection and non-mutation policy
 
-`make update-toolchain` reads the official nightly distribution manifest, checks
-the host has rustc/cargo/rust-std in that published release, installs
-`nightly-YYYY-MM-DD --profile minimal --no-self-update`, and compares rustc's
-full commit/release with the manifest. A second manifest read detects a channel
-change during installation. No `--allow-downgrade`, `--force`, default change,
-or unversioned-nightly backtracking is used. Rustup performs distribution
-artifact verification; the kit's recorded manifest SHA is provenance, not a
-separate signature authority.
+The default discovery order for each tool is explicit `HOST_RUSTC`, `HOST_CARGO`,
+`HOST_RUSTDOC`; the corresponding standard `RUSTC`, `CARGO`, `RUSTDOC` value;
+PATH; then existing `$CARGO_HOME/bin` and `$HOME/.cargo/bin` directories.
+Explicit paths are executable paths, not shell command strings. Paths containing
+spaces are supported. A missing explicit path is an error, not a fallback to a
+different compiler. Native/distro tools work without Rustup, even when another
+Rustup installation also exists on the host.
 
-The dated selection lives in `toolchain-selection.json`; it overrides this
-kit's `TOOLCHAIN=nightly`, not your global rustup default or existing nightly
-alias. Explicitly selected other installed toolchains are not overridden by
-that file. `make lock-toolchain` deliberately accepts an installed compiler
-identity for locked rebuilds; it cannot make a stale compiler satisfy an existing
-latest-nightly selection. `make update-rustup` separately calls the existing
-manager's self-update; a manager built without self-update must be maintained
-through its distributor. Online `make package` can install the selected dated
-nightly through the existing rustup; it does not install or self-update rustup.
+Rustup symlink and hardlink proxies are detected before symlinks are resolved.
+Only `rustup which [--toolchain NAME] rustc|cargo|rustdoc` queries are made;
+`--install` is never passed. Queries run from the build-kit root, before entering
+the upstream tree. The resulting concrete executable paths are then used by
+Cargo, probes and build scripts. All build subprocesses receive
+`RUSTUP_AUTO_INSTALL=0`. No Rust manifest download, installer, component/target
+addition, self-update, default mutation or directory-override write exists in
+the build driver. An already-installed `TOOLCHAIN=NAME` can be explicitly chosen;
+it cannot be combined with explicit host tool paths. In host mode, the user's
+existing `RUSTUP_TOOLCHAIN` is not replaced by the literal string `host`.
 
-The resolver fails rather than guessing when it cannot retrieve or parse the
-official manifest, a minimal component is missing, or identities do not match.
-This authoring environment could not execute the live manifest/rustup path;
-see VALIDATION.md. Accurate system time and normal HTTPS trust are required.
+`toolchain.lock.json` schema 2 records the selected executable paths, rustc -vV,
+and Cargo version. It does not pin the user's compiler or request installation.
+A host upgrade changes the metadata and build identity. The old
+`toolchain-selection.json` is ignored even when it names a missing nightly.
+`make lock-toolchain` refreshes only this local record. `update-toolchain` and
+`update-rustup` are intentionally disabled, including explicit invocations.
+An insufficient or missing host compiler fails with no automatic upgrade,
+nightly fallback, `RUSTC_BOOTSTRAP`, or `--ignore-rust-version` workaround.
 
-### Entrypoint and existing rustup discovery
+Existing Cargo home and ancestor `.cargo/config`/`config.toml` files are trusted
+read-only inputs. Their presence is no longer a build error. No global config
+is copied, renamed, removed or rewritten. Direct config-file hashes (not file
+contents or credentials) are included in build provenance. This is not a full
+capture of included configuration files or all environment variables. Normal
+Cargo cache writes remain normal cache writes. `cargo vendor` uses
+`--respect-source-config` to keep existing registry source settings available.
+The generated vendor configuration is local `.work/vendor-config.toml`, passed
+with `--config`; it never replaces Cargo home's config.
 
-The Makefile uses `/usr/bin/python3 -I -B`. Bundled `debian.py` and `latest.py`
+### Entrypoint and bundled helpers
+
+The Makefile uses `/usr/bin/python3 -I -B`. Bundled `debian.py` and `host_rust.py`
 are loaded by their paths next to `build.py`, under private module names.
-Neither PYTHONPATH nor script-directory insertion is required. An incomplete
-extraction reports the missing file explicitly; these are not pip dependencies.
-Isolated mode is also used for the install/verify subprocesses.
-
-The driver finds rustup in the existing PATH, `$CARGO_HOME/bin`, or
-`$HOME/.cargo/bin`, in that order, without changing the user's shell. The kit
-must be run by the user who owns that installation. `config.mk` is optional.
+Neither PYTHONPATH nor script-directory insertion is required. Missing helpers
+produce an incomplete-extraction error, not a request to pip-install a module.
+Isolated Python is also used for install/verify subprocesses. `config.mk` is
+optional, project-local, trusted Make code. Nothing modifies shell startup files.
 
 ### Dependency overlay and Git provenance
 
@@ -158,20 +169,23 @@ retired copies and caches; archive anything you need before cleaning.
 | Jobs | CPU affinity/quota and visible memory headroom heuristic; override JOBS=N |
 
 Native code generation applies to the compiled crates/dependencies, not to
-rebuilding rustup's already compiled standard library. CPU-specific flags do
+rebuilding the host compiler's already compiled standard library. CPU-specific flags do
 not promise a speedup on every workload. No fast-math, panic-abort, forced AVX
 level, unstable compiler flags or mismatched cross-language LLVM LTO is enabled.
 `TUNE=portable` removes native CPU flags; shared-library compatibility is still
 required. Flags and effective compiler configuration are recorded with the
 host CPU signature, selected source/dependency locks and installed packages.
 
-Ambient RUSTFLAGS/CFLAGS, target/profile overrides, compiler wrappers and
-shadow Cargo configuration are rejected when they could override controlled
-settings. Use `EXTRA_RUSTFLAGS`, `EXTRA_CFLAGS`, `EXTRA_CXXFLAGS` only as reviewed
-trusted configuration. A config.mk is trusted Make code, not untrusted data.
-CARGO_HOME defaults to an isolated `.work/cargo-home`; using your own cache is
-allowed only without a conflicting Cargo config. No claim of a hermetic build
-is made: upstream build scripts execute with the build user's permissions.
+Ambient RUSTFLAGS/CFLAGS, target/profile overrides and environment-specified
+compiler wrappers remain rejected when they make controlled flags ambiguous.
+Use `EXTRA_RUSTFLAGS`, `EXTRA_CFLAGS`, `EXTRA_CXXFLAGS` as reviewed build options;
+this rejection never edits the shell or its files. RUSTC/CARGO/RUSTDOC are
+accepted host-tool selectors. Existing Cargo **configuration files** are not
+rejected. Cargo merges those trusted settings with per-process build options.
+`CARGO_HOME` defaults to the host's `$HOME/.cargo`; an explicitly supplied value
+is honored, including configurations for mirrors/proxies. Project outputs are
+under `.work/`. A symlinked `.work` is refused. The build is not hermetic or a
+sandbox: upstream build scripts and user-configured wrappers run as the user.
 
 `make doctor` compiles and executes tiny Rust/C/C++ probes; it is not a workload
 or a check of upstream compilation. `make check` runs Cargo check for selected
@@ -192,24 +206,41 @@ output. Default binaries are resctl-bench, rd-agent, rd-hashd, resctl-demo.
 | help / all | Show available operations / alias package. |
 | deps / deps-plan / deps-runtime / deps-llvm | Install build dependencies / simulate / install runtime / optional LLVM. |
 | fetch / update-source | Fetch once at requested ref / deliberately move the source lock. |
-| update-toolchain / update-rustup / lock-toolchain | Resolve latest nightly / update manager / accept installed compiler. |
+| update-toolchain / update-rustup / lock-toolchain | Disabled / disabled / record host identity locally. |
 | update-deps / fetch-deps | Refresh compatible dependency overlay / fetch locked dependencies. |
 | versions / doctor | Print provenance / probe compiler and linker. |
-| package / latest / latest-complete | Refresh inputs and make runtime / runtime plus populated source distributions. |
+| package / latest / latest-complete | Locked runtime build / explicit source-crate refresh / refresh plus vendored source. |
 | build / check / test-compile | Release binary build / check / compile tests without running. |
 | smoke / stage / rebuild / verify | CLI checks / stage payload / package selected inputs / verify latest result. |
-| vendor / source-dist / kit-dist | Vendor locked crates / populated source archive / build-kit-only archive. |
+| vendor / source-dist / kit-dist | Vendor locked crates / vendored source archive / build-kit-only archive. |
+| snapshot-dist | Complete selected source snapshot without needing Rust or vendoring. |
 | lint / test | Syntax/whitespace checks / orchestration fixture tests. |
 | runtime-check | Read-only inventory, optional SCRATCH existing directory. |
 | install / uninstall | Install last packaged payload / remove only tracked unchanged payloads. |
 | clean / clean-vendor | Delete generated work state / delete checked vendor directory. |
 
 `JOBS`, `TUNE`, `LTO`, `WITH_DEMO`, `SPLIT_DEBUG`, `OFFLINE`, `HOST_CC`,
-`HOST_CXX`, `UPSTREAM_URL`, `UPSTREAM_REF`, `TOOLCHAIN`, `PREFIX`, `DESTDIR`,
+`HOST_CXX`, `HOST_RUSTC`, `HOST_CARGO`, `HOST_RUSTDOC`, `UPSTREAM_URL`, `UPSTREAM_REF`, `TOOLCHAIN`, `PREFIX`, `DESTDIR`,
 `FORCE`, and extra flags can be set as Make arguments or in config.mk. Multiple
 Make goals are serialized. A project-level advisory lock serializes drivers.
 
 ## Release/source distributions and installation
+
+The delivered host-rust snapshot is produced by `make snapshot-dist`: it includes
+all supplied upstream source files and the modified build kit, a real minimal
+Git object store and source locks. It does not need Rust/network to create.
+It includes a vendor/dependency-lock tree only when already present and verified.
+`source-snapshot.json` records whether dependencies are vendored. This particular
+delivery has no vendored third-party crates; first-build registry access or an
+existing cache is required. `config.mk` in a snapshot is copied from the shipped
+example, never from the source host's private overrides.
+
+Upstream source, including its separate CI/Lambda workflow definitions, is
+preserved unchanged under `upstream/`. Those nested workflow definitions are
+not the root build-kit workflow and are never invoked by this driver. Use the
+root Makefile for the host-only policy. The root real-build CI job now requires
+a pre-provisioned self-hosted runner rather than installing Rust.
+
 
 A runtime package contains regular files only. SHA256SUMS covers payload files;
 the archive has its own .sha256 sidecar. These detect accidental changes, not
@@ -264,10 +295,10 @@ failure after binary packaging does not invalidate that successful binary archiv
 
 For an upstream failure, inspect `.work/builds/<build-id>/build.log` and
 `.work/logs/`; keep the recorded inputs. Reduce JOBS for memory pressure; try
-LTO=off only as an explicit diagnostic. A strict latest failure is not evidence
-that an older toolchain was tried or accepted. Resolving API changes in a
-future upstream/nightly/dependency combination can require reviewed source
-patches. This kit intentionally does not invent them automatically.
+LTO=off only as an explicit diagnostic. A compilation failure never triggers
+another toolchain installation. Resolving API or minimum-Rust-version changes
+in a source/dependency combination can require reviewed host maintenance or
+source patches. This kit intentionally does not invent them automatically.
 
 For host-readiness concerns see RUNTIME.md. A compile or CLI smoke pass is not
 evidence of valid IOCost measurements, NVMe health, or runtime BPF compatibility.

@@ -40,7 +40,7 @@ class EntrypointTests(unittest.TestCase):
     def test_direct_safe_path_with_conflicting_external_modules(self):
         poison = Path(self.temp.name) / "foreign python packages"
         poison.mkdir()
-        for module in ("debian", "latest"):
+        for module in ("debian", "host_rust"):
             (poison / (module + ".py")).write_text('raise RuntimeError("foreign module imported")\n')
         result = self.run_command([sys.executable, "-B", "scripts/build.py", "help"],
                                   PYTHONSAFEPATH="1", PYTHONPATH=str(poison))
@@ -56,12 +56,12 @@ class EntrypointTests(unittest.TestCase):
         self.assert_success(self.run_command(["make", "--no-print-directory", "lint"],
                                             PYTHONSAFEPATH="1"))
 
-    def test_missing_latest_reports_incomplete_archive_not_pip_dependency(self):
-        (self.root / "scripts/latest.py").unlink()
+    def test_missing_host_rust_reports_incomplete_archive_not_pip_dependency(self):
+        (self.root / "scripts/host_rust.py").unlink()
         result = self.run_command(["make", "--no-print-directory", "help"])
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Incomplete build kit", result.stderr)
-        self.assertIn("latest.py", result.stderr)
+        self.assertIn("host_rust.py", result.stderr)
         self.assertIn("do not pip-install", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
@@ -81,8 +81,16 @@ class EntrypointTests(unittest.TestCase):
         result = self.run_command(["make", "--no-print-directory", "package", "OFFLINE=1"],
                                   ALLOW_ROOT_BUILD="1", PYTHONSAFEPATH="1")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("requires an existing locked source tree", result.stderr)
+        self.assertIn("ERROR:", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
+
+    def test_disabled_install_targets_fail_cleanly_from_make(self):
+        for action in ("update-toolchain", "update-rustup"):
+            with self.subTest(action=action):
+                result = self.run_command(["make", "--no-print-directory", action])
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("disabled", result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
 
     def test_make_package_uses_one_driver_process(self):
         result = self.run_command(["make", "--no-print-directory", "--dry-run", "package"])
@@ -96,12 +104,14 @@ class DispatchTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
 
-    def test_online_package_resolves_and_builds_in_one_call(self):
+    def test_online_package_builds_without_any_update_dispatch(self):
         with patch.object(bk, "ROOT", self.root), patch.dict(os.environ, {"OFFLINE": "0"}), \
              patch.object(sys, "argv", ["build.py", "package"]), \
-             patch.object(bk.Builder, "newest") as newest:
+             patch.object(bk.Builder, "newest") as newest, \
+             patch.object(bk.Builder, "package") as package:
             self.assertEqual(bk.main(), 0)
-            newest.assert_called_once_with()
+            newest.assert_not_called()
+            package.assert_called_once_with()
 
     def test_offline_package_skips_all_updates(self):
         with patch.object(bk, "ROOT", self.root), patch.dict(os.environ, {"OFFLINE": "1"}), \
@@ -127,46 +137,6 @@ class DispatchTests(unittest.TestCase):
                  patch.object(bk.Builder, "newest") as newest:
                 self.assertEqual(bk.main(), 0)
                 newest.assert_called_once_with(complete=complete)
-
-
-class RustupPathTests(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.home = Path(self.temp.name)
-
-    def tool(self, home):
-        binary = home / "bin/rustup"
-        binary.parent.mkdir(parents=True)
-        binary.write_text("#!/bin/sh\nexit 0\n")
-        binary.chmod(0o755)
-        return binary
-
-    def test_existing_home_install_needs_no_path_export(self):
-        binary = self.tool(self.home / ".cargo")
-        env = {"PATH": "/usr/bin:/bin", "HOME": str(self.home)}
-        result = bk.rustup_environment(env)
-        self.assertEqual(shutil.which("rustup", path=result["PATH"]), str(binary))
-        self.assertEqual(env["PATH"], "/usr/bin:/bin")
-
-    def test_custom_cargo_home_install_is_discovered(self):
-        cargo = self.home / "custom rust install"
-        binary = self.tool(cargo)
-        result = bk.rustup_environment({"PATH": "/usr/bin:/bin", "HOME": str(self.home),
-                                       "CARGO_HOME": str(cargo)})
-        self.assertEqual(shutil.which("rustup", path=result["PATH"]), str(binary))
-
-    def test_existing_path_install_takes_precedence(self):
-        first = self.tool(self.home / "preferred")
-        self.tool(self.home / ".cargo")
-        env = {"PATH": str(first.parent) + ":/usr/bin", "HOME": str(self.home)}
-        self.assertEqual(bk.rustup_environment(env), env)
-
-    def test_non_executable_rustup_is_not_selected(self):
-        binary = self.tool(self.home / ".cargo")
-        binary.chmod(0o644)
-        env = {"PATH": "/usr/bin:/bin", "HOME": str(self.home)}
-        self.assertEqual(bk.rustup_environment(env), env)
 
 
 class PrivilegePromptTests(unittest.TestCase):

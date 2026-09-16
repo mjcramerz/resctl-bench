@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Tests use fake rustup/Cargo plus real Git, GCC ELF, strip and objcopy.
+"""Tests use fake host Rust/Cargo plus real Git, GCC ELF, strip and objcopy.
 
 These validate orchestration and packaging, NOT upstream Rust compilation.
 No test needs network access, root, systemd, cgroup writes or an NVMe device.
@@ -115,13 +115,17 @@ import json, os, pathlib, shutil, sys
 p = pathlib.Path
 name = p(sys.argv[0]).name
 args = sys.argv[1:]
-if name == 'rustup':
-    print(p(__file__).parent / args[-1]); sys.exit(0)
+if name in ('rustup', 'sudo', 'apt-get'):
+    with open(os.environ['FIXTURE_LOG'],'a') as f:
+        f.write(json.dumps({'forbidden':name,'args':args})+'\n')
+    sys.exit('forbidden installer/manager invocation: '+name+' '+repr(args))
+if name in ('rustc', 'cargo', 'rustdoc') and os.environ.get('RUSTUP_AUTO_INSTALL') != '0':
+    sys.exit('automatic Rust installation was not disabled')
 if name == 'rustdoc':
     print('rustdoc fixture'); sys.exit(0)
 if name == 'rustc':
     if '-vV' in args:
-        print('rustc 1.95.0-nightly (fixture)\nbinary: rustc\ncommit-hash: ffffffffffffffffffffffffffffffffffffffff\ncommit-date: 2026-01-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0-nightly\nLLVM version: 21.0.0')
+        print('rustc 1.95.0 (fixture)\nbinary: rustc\ncommit-hash: ffffffffffffffffffffffffffffffffffffffff\ncommit-date: 2026-01-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 21.0.0')
     elif '--print' in args:
         print('target_arch="x86_64"\ntarget_feature="sse2"')
     elif '-o' in args:
@@ -131,7 +135,7 @@ if name == 'rustc':
         sys.exit('unexpected rustc invocation: '+repr(args))
     sys.exit(0)
 if args == ['--version']:
-    print(os.environ.get('FIXTURE_CARGO_VERSION','cargo 1.95.0-nightly (fixture)')); sys.exit(0)
+    print(os.environ.get('FIXTURE_CARGO_VERSION','cargo 1.95.0 (fixture)')); sys.exit(0)
 while args[:1] == ['--config']:
     args = args[2:]
 command = args[0]
@@ -139,7 +143,10 @@ with open(os.environ['FIXTURE_LOG'],'a') as f:
     f.write(json.dumps({'args':sys.argv[1:], 'command':command,
        'rustflags':os.environ.get('CARGO_ENCODED_RUSTFLAGS'),
        'cflags':os.environ.get('CFLAGS'), 'panic':os.environ.get('CARGO_PROFILE_RELEASE_PANIC'),
-       'lto':os.environ.get('CARGO_PROFILE_RELEASE_LTO'), 'target':os.environ.get('CARGO_TARGET_DIR')})+'\n')
+       'lto':os.environ.get('CARGO_PROFILE_RELEASE_LTO'), 'target':os.environ.get('CARGO_TARGET_DIR'),
+       'rustc':os.environ.get('RUSTC'), 'cargo':os.environ.get('CARGO'),
+       'rustup_auto_install':os.environ.get('RUSTUP_AUTO_INSTALL'),
+       'cargo_home':os.environ.get('CARGO_HOME')})+'\n')
 manifest = p(args[args.index('--manifest-path')+1])
 source = manifest.parent
 if command == 'build':
@@ -230,7 +237,7 @@ class PipelineTests(unittest.TestCase):
         git(self.remote, "commit", "-m", "fixture initial")
         fakebin = base / "fakebin"
         fakebin.mkdir()
-        for tool in ("cargo", "rustc", "rustdoc", "rustup"):
+        for tool in ("cargo", "rustc", "rustdoc", "rustup", "sudo", "apt-get"):
             (fakebin / tool).write_text(FAKE_TOOL.replace("#!/usr/bin/env python3", "#!" + sys.executable))
             (fakebin / tool).chmod(0o755)
         self.log = base / "commands.jsonl"
@@ -248,6 +255,29 @@ class PipelineTests(unittest.TestCase):
 
     def calls(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()]
+
+    def test_complete_snapshot_contains_all_source_and_needs_no_rust(self):
+        self.builder.fetch()
+        with patch.object(self.builder, "tools", side_effect=AssertionError("snapshot must not need Rust")):
+            archive = self.builder.snapshot_dist()
+        unpack = Path(self.temp.name) / "snapshot extraction"
+        unpack.mkdir()
+        with tarfile.open(archive) as tar:
+            tar.extractall(unpack, filter="data")
+        kit = next(unpack.iterdir())
+        self.assertTrue((kit / "config.mk").is_file())
+        self.assertTrue((kit / "scripts/host_rust.py").is_file())
+        self.assertFalse((kit / "scripts/latest.py").exists())
+        self.assertFalse((kit / "toolchain-selection.json").exists())
+        info = bk.read_json(kit / "source-snapshot.json")
+        self.assertFalse(info["vendored_dependencies"])
+        self.assertFalse(info["contains_compiled_binaries"])
+        self.assertEqual(self.builder.verify_source(), bk.Builder(kit, self.cfg).verify_source())
+        for binary in self.cfg.binaries:
+            self.assertTrue((kit / "upstream" / binary / "src/main.rs").is_file())
+        result = subprocess.run(["sha256sum", "-c", "SHA256SUMS"], cwd=kit, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.calls(), [])
 
     def test_source_pin_does_not_follow_branch(self):
         first = self.builder.fetch()
@@ -300,12 +330,16 @@ class PipelineTests(unittest.TestCase):
             self.builder.build()
         self.assertFalse((out / "result.json").exists())
 
-    def test_compiler_drift_is_rejected(self):
+    def test_host_compiler_change_records_new_identity_without_install(self):
         self.builder.tools()
+        before = bk.read_json(self.root / "toolchain.lock.json")
         with patch.dict(os.environ, {"FIXTURE_CARGO_VERSION": "cargo CHANGED"}):
-            with self.assertRaises(bk.BuildError):
-                bk.Builder(self.root, self.cfg).tools()
-            bk.Builder(self.root, self.cfg).tools(refresh=True)
+            tools = bk.Builder(self.root, self.cfg).tools()
+            self.assertEqual(tools["cargo_version"], "cargo CHANGED")
+        after = bk.read_json(self.root / "toolchain.lock.json")
+        self.assertNotEqual(before, after)
+        self.assertEqual(after["policy"], "host-installed-only")
+        self.assertFalse(any("forbidden" in row for row in self.calls()))
 
     def test_vendor_tampering_is_rejected(self):
         self.builder.vendor()
@@ -465,11 +499,36 @@ class PipelineTests(unittest.TestCase):
         self.assertFalse((self.builder.dist / "resctl-bench-latest.tar.gz").exists())
         self.assertFalse((self.builder.dist / "resctl-bench-latest.tar.gz.sha256").exists())
 
-    def test_shadow_cargo_config_rejected(self):
-        (self.root / ".cargo").mkdir()
-        (self.root / ".cargo/config.toml").write_text('[build]\nrustflags=["-Ctarget-cpu=generic"]\n')
-        with self.assertRaises(bk.BuildError):
-            self.builder.tools()
+    def test_existing_global_and_ancestor_configs_are_preserved(self):
+        cargo = self.builder.cargo_home
+        home = Path(self.temp.name) / "sentinel-home"
+        files = {
+            cargo / "config.toml": b'[net]\nretry = 2\n',
+            cargo / "config": b'# Legacy Cargo configuration remains untouched\n',
+            home / ".rustup/settings.toml": b'default_toolchain = "host-choice"\n',
+            home / ".profile": b'# keep shell configuration unchanged\n',
+            self.root.parent / ".cargo/config.toml": b'[build]\nrustflags=["-Ctarget-cpu=generic"]\n',
+            self.root / ".cargo/config.toml": b'[net]\nretry = 3\n',
+        }
+        for path, data in files.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        before = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in files}
+        with patch.dict(os.environ, {"HOME": str(home), "RUSTUP_AUTO_INSTALL": "1"}):
+            self.builder.doctor()
+            self.builder.update_dependencies()
+            self.builder.build("check")
+            self.builder.build("test-compile")
+            self.builder.package()
+            self.builder.source_dist()
+        after = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in files}
+        self.assertEqual(before, after)
+        self.assertFalse(any("forbidden" in row for row in self.calls()))
+        for row in self.calls():
+            self.assertEqual(row["rustup_auto_install"], "0")
+            self.assertEqual(row["cargo_home"], str(cargo))
+            self.assertTrue(Path(row["rustc"]).is_absolute())
+            self.assertTrue(Path(row["cargo"]).is_absolute())
 
     def test_wrong_architecture_elf_rejected(self):
         with self.assertRaises(bk.BuildError):
@@ -514,53 +573,26 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(checksum, bk.digest(alias))
 
 
-    def test_online_make_package_orchestrates_setup_build_and_tarball(self):
-        """Use actual Make/main/newest; substitute only external APT/nightly services.
-
-        Cargo remains the explicitly synthetic compiler fixture used by this suite.
-        This is not a real Forky or upstream compiler compatibility test.
-        """
-        launcher = Path(self.temp.name) / "online_fixture.py"
-        launcher.write_text(r'''import importlib.util, pathlib, sys
-path = pathlib.Path(sys.argv[1]).resolve()
-spec = importlib.util.spec_from_file_location("fixture_driver", path)
-driver = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = driver
-spec.loader.exec_module(driver)
-driver.debian.require_forky = lambda **kwargs: {"ID": "debian", "VERSION_CODENAME": "forky"}
-def apt(root, group, run, write_json, **kwargs):
-    plan = {"schema": 1, "fixture": True, "group": group, "packages": []}
-    write_json(root / ".work" / ("apt-" + group + ".json"), plan)
-    return plan
-driver.debian.install_dependencies = apt
-def nightly(self):
-    selection = {"schema": 1, "requested_toolchain": "nightly",
-                 "resolved_toolchain": "nightly-2026-01-02", "fixture": True,
-                 "host": "x86_64-unknown-linux-gnu", "rustc_commit": "f" * 40,
-                 "rustc_version": "1.95.0-nightly (synthetic)"}
-    driver.write_json(self.root / "toolchain-selection.json", selection)
-    self.tools(refresh=True)
-driver.Builder.update_toolchain = nightly
-sys.argv = sys.argv[1:]
-sys.exit(driver.main())
-''')
+    def test_online_make_package_never_invokes_apt_or_rustup_or_updates_crates(self):
+        """Actual Make/main/package, with host Rust simulated and real ELF output."""
         env = dict(os.environ, UPSTREAM_URL=str(self.remote), PYTHONSAFEPATH="1")
         result = subprocess.run(
-            ["make", "--no-print-directory", "-C", str(self.root), "package",
-             "PYTHON=" + sys.executable + " -I " + str(launcher), "PYTHON_FLAGS="],
+            ["make", "--no-print-directory", "-C", str(self.root), "package"],
             env=env, text=True, capture_output=True, timeout=120,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("Binary tarball:", result.stdout)
         alias = self.root / "dist/resctl-bench-latest.tar.gz"
         self.assertTrue(alias.is_file())
+        self.assertFalse(any("forbidden" in row for row in self.calls()))
         commands = [row["command"] for row in self.calls()]
-        self.assertLess(commands.index("update"), commands.index("build"))
-        self.assertTrue((self.root / "dependency-lock/Cargo.lock.diff").is_file())
+        self.assertNotIn("update", commands)
+        self.assertFalse((self.root / "dependency-lock").exists())
         with tarfile.open(alias) as tar:
             names = tar.getnames()
             for binary in self.cfg.binaries:
                 self.assertTrue(any(name.endswith("/bin/" + binary) for name in names))
+
 
 
 if __name__ == "__main__":

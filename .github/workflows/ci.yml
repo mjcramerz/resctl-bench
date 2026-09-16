@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       upstream_build:
-        description: 'Build actual current upstream and newest nightly on Forky; vendor and rebuild offline'
+        description: 'Build actual current upstream and host-installed Rust on Forky; vendor and rebuild offline'
         required: false
         type: boolean
         default: false
@@ -27,37 +27,31 @@ jobs:
         run: |
           make kit-dist
           mkdir /tmp/kit-release-check
-          tar -xzf dist/resctl-bench-buildkit-2.1.0.tar.gz -C /tmp/kit-release-check
-          cd /tmp/kit-release-check/resctl-bench-buildkit-2.1.0
+          tar -xzf dist/resctl-bench-buildkit-2.2.0.tar.gz -C /tmp/kit-release-check
+          cd /tmp/kit-release-check/resctl-bench-buildkit-2.2.0
           sha256sum -c SHA256SUMS
           PYTHONSAFEPATH=1 make help lint test
   real-upstream:
     if: github.event_name == 'workflow_dispatch' && inputs.upstream_build
-    runs-on: ubuntu-latest
-    container: debian:forky
-    env:
-      ALLOW_ROOT_BUILD: '1' # Only for this disposable container, not your host.
-      TUNE: portable
+    # Administrators provide this runner with Rust and Debian dependencies.
+    # This job NEVER provisions/updates a Rust toolchain or the package manager.
+    runs-on: [self-hosted, linux, resctl-host-rust]
     steps:
-      - run: apt-get update --error-on=any && apt-get install -y --no-install-recommends ca-certificates curl git make python3
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # retained supplied pin; not revalidated here
         with:
           persist-credentials: false
-      - name: Provision rustup only in disposable CI (host already has it)
-        shell: bash
-        run: |
-          curl --proto '=https' --tlsv1.2 --fail --silent --show-error https://sh.rustup.rs -o /tmp/rustup-init.sh
-          sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain none
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-      - run: make latest-complete verify
+      - name: Verify the preinstalled host tools
+        run: make doctor TOOLCHAIN=host TUNE=portable
+      - run: make latest-complete verify TOOLCHAIN=host TUNE=portable
       - name: Relocate the populated source distribution and compile offline
         shell: bash
         run: |
-          mkdir /tmp/relocated-build
-          tar -xzf dist/resctl-bench-buildkit-*-source-*.tar.gz -C /tmp/relocated-build
-          cd /tmp/relocated-build/resctl-bench-buildkit-*-source-*
-          make package verify OFFLINE=1 TUNE=portable
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+          scratch=$(mktemp -d)
+          trap 'rm -rf "$scratch"' EXIT
+          tar -xzf dist/resctl-bench-buildkit-*-source-*.tar.gz -C "$scratch"
+          cd "$scratch"/resctl-bench-buildkit-*-source-*
+          make package verify OFFLINE=1 TOOLCHAIN=host TUNE=portable
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # retained supplied pin; not revalidated here
         with:
           name: forky-release-and-source
           path: dist/*

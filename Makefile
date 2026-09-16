@@ -9,13 +9,16 @@ PYTHON_FLAGS ?= -I -B
 
 UPSTREAM_URL ?= https://github.com/facebookexperimental/resctl-demo.git
 UPSTREAM_REF ?= main
-TOOLCHAIN ?= nightly
+TOOLCHAIN ?= host
 TUNE ?= native
 LTO ?= thin
 JOBS ?= auto
 WITH_DEMO ?= 1
 SPLIT_DEBUG ?= 1
 OFFLINE ?= 0
+HOST_RUSTC ?=
+HOST_CARGO ?=
+HOST_RUSTDOC ?=
 HOST_CC ?= /usr/bin/gcc
 HOST_CXX ?= /usr/bin/g++
 PREFIX ?= /usr/local
@@ -24,11 +27,12 @@ FORCE ?= 0
 export UPSTREAM_URL UPSTREAM_REF TOOLCHAIN TUNE LTO JOBS WITH_DEMO
 export SPLIT_DEBUG OFFLINE HOST_CC HOST_CXX PREFIX DESTDIR FORCE
 export EXTRA_RUSTFLAGS EXTRA_CFLAGS EXTRA_CXXFLAGS
+export HOST_RUSTC HOST_CARGO HOST_RUSTDOC RUSTC CARGO RUSTDOC
 
 DRIVER_TARGETS := deps deps-runtime deps-plan deps-llvm doctor fetch update-source \
  update-toolchain update-rustup update-deps lock-toolchain versions \
  latest latest-complete fetch-deps build check test-compile smoke stage package \
- rebuild verify vendor source-dist kit-dist install uninstall clean clean-vendor lint
+ rebuild verify vendor source-dist snapshot-dist kit-dist install uninstall clean clean-vendor lint
 .PHONY: help all $(DRIVER_TARGETS) test runtime-check
 
 help:

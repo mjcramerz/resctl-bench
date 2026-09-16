@@ -15,7 +15,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import build as bk
 debian = bk.debian
-latest = bk.latest
 
 POLICY = '''Package files:
  100 /var/lib/dpkg/status
@@ -30,14 +29,6 @@ POLICY = '''Package files:
      release o=Other,n=forky
 '''
 FORKY_INDEX = 'https://deb.debian.org/debian testing/main amd64 Packages'
-
-
-def manifest() -> bytes:
-    result = 'manifest-version = "2"\ndate = "2026-01-02"\n'
-    for component in ('rust', 'rustc', 'rust-std', 'cargo'):
-        result += f'[pkg.{component}]\nversion = "1.95.0-nightly (synthetic)"\ngit_commit_hash = "' + 'a' * 40 + '"\n'
-        result += f'[pkg.{component}.target.x86_64-unknown-linux-gnu]\navailable = true\n'
-    return result.encode()
 
 
 class DebianPolicyTests(unittest.TestCase):
@@ -162,102 +153,5 @@ class DebianPolicyTests(unittest.TestCase):
                 debian.install_dependencies(ROOT, 'build', run, lambda *a: None, plan_only=True)
 
 
-class NightlyPolicyTests(unittest.TestCase):
-    def test_exact_dated_nightly_selected(self):
-        info = latest.parse_manifest(manifest(), 'x86_64-unknown-linux-gnu')
-        self.assertEqual(info['resolved_toolchain'], 'nightly-2026-01-02')
-        self.assertEqual(info['rustc_commit'], 'a' * 40)
-
-    def test_missing_component_has_no_old_nightly_fallback(self):
-        with self.assertRaises(latest.LatestError):
-            latest.parse_manifest(manifest().replace(b'available = true', b'available = false', 1), 'x86_64-unknown-linux-gnu')
-
-    def test_missing_target_rejected(self):
-        with self.assertRaises(latest.LatestError):
-            latest.parse_manifest(manifest(), 'aarch64-unknown-linux-gnu')
-
-    def test_future_manifest_rejected(self):
-        with self.assertRaises(latest.LatestError):
-            latest.parse_manifest(manifest().replace(b'2026-01-02', b'2999-01-01'), 'x86_64-unknown-linux-gnu')
-
-    def test_changed_compiler_identity_rejected(self):
-        selection = latest.parse_manifest(manifest(), 'x86_64-unknown-linux-gnu')
-        vv = 'host: x86_64-unknown-linux-gnu\ncommit-hash: ' + 'a' * 40 + '\nrelease: 1.95.0-nightly\n'
-        latest.verify_compiler(selection, vv)
-        with self.assertRaises(latest.LatestError):
-            latest.verify_compiler(selection, vv.replace('a' * 40, 'b' * 40))
-
-    def test_selected_nightly_does_not_override_explicit_toolchain(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            selection = latest.parse_manifest(manifest(), 'x86_64-unknown-linux-gnu')
-            (root / 'toolchain-selection.json').write_text(json.dumps(selection))
-            self.assertEqual(latest.selected_toolchain(root, 'nightly'), 'nightly-2026-01-02')
-            self.assertEqual(latest.selected_toolchain(root, 'nightly-2026-01-01'), 'nightly-2026-01-01')
-
-    def test_malformed_selection_rejected(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            (root / 'toolchain-selection.json').write_text('{"resolved_toolchain": "--bad"}')
-            with self.assertRaises(latest.LatestError):
-                latest.selected_toolchain(root, 'nightly')
-
-
-class NightlyWorkflowTests(unittest.TestCase):
-    def _run_update(self, root, *, changed=False, stale=False):
-        builder = bk.Builder(root, bk.Config.from_env({}))
-        calls = []
-        content = manifest()
-        vv = 'host: x86_64-unknown-linux-gnu\ncommit-hash: ' + ('b' if stale else 'a') * 40 + '\nrelease: 1.95.0-nightly\n'
-        def run(args, **kwargs):
-            calls.append([str(a) for a in args])
-            if args == ['dpkg', '--print-architecture']:
-                return 'amd64\n'
-            if args[:3] == ['rustup', 'toolchain', 'install']:
-                return ''
-            if args[:2] == ['rustup', 'which']:
-                return '/synthetic/rustc\n'
-            if args == ['/synthetic/rustc', '-vV']:
-                return vv
-            raise AssertionError(args)
-        after = content.replace(b'2026-01-02', b'2026-01-03') if changed else content
-        with patch.object(builder, 'assert_build_user'), patch.object(builder, 'tools'), \
-             patch.object(debian, 'require_forky'), patch.object(latest, 'download_manifest', side_effect=[content, after]), \
-             patch.object(bk, 'run', side_effect=run):
-            builder.update_toolchain()
-        return calls
-
-    def test_install_is_exact_minimal_and_does_not_change_global_default(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            calls = self._run_update(root)
-            install = [args for args in calls if args[:3] == ['rustup', 'toolchain', 'install']]
-            self.assertEqual(install, [['rustup', 'toolchain', 'install', 'nightly-2026-01-02',
-                                        '--profile', 'minimal', '--no-self-update']])
-            self.assertFalse(any('default' in args or '--allow-downgrade' in args for args in calls))
-            self.assertTrue((root / 'toolchain-selection.json').is_file())
-
-    def test_channel_race_does_not_replace_existing_selection(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            prior = latest.parse_manifest(manifest(), 'x86_64-unknown-linux-gnu')
-            bk.write_json(root / 'toolchain-selection.json', prior)
-            with self.assertRaises(bk.BuildError):
-                self._run_update(root, changed=True)
-            self.assertEqual(bk.read_json(root / 'toolchain-selection.json'), prior)
-
-    def test_stale_installed_compiler_is_never_published(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            with self.assertRaises(latest.LatestError):
-                self._run_update(root, stale=True)
-            self.assertFalse((root / 'toolchain-selection.json').exists())
-
-    def test_offline_toolchain_update_has_no_network_call(self):
-        with tempfile.TemporaryDirectory() as temp:
-            builder = bk.Builder(Path(temp), bk.Config.from_env({'OFFLINE': '1'}))
-            with patch.object(builder, 'assert_build_user'), patch.object(debian, 'require_forky'), \
-                 patch.object(latest, 'download_manifest') as download:
-                with self.assertRaises(bk.BuildError):
-                    builder.update_toolchain()
-                download.assert_not_called()
+if __name__ == "__main__":
+    unittest.main()

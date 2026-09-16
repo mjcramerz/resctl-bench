@@ -1,5 +1,28 @@
 # Changes
 
+## 2.2.0 - 2026-09-16
+
+* Default to host-installed Rust; support native Debian tools and existing Rustup
+  proxies, including symlinks/hardlinks and executable paths with spaces.
+* Replace the nightly-manifest helper with host_rust.py. Remove all Rust install,
+  update, self-update and forced-nightly paths from active build orchestration.
+* Set RUSTUP_AUTO_INSTALL=0 for subprocesses; resolve proxies only using which.
+  Preserve inherited host selection and use concrete tools for compilation.
+* Accept existing Cargo home/ancestor configs without rewriting any config.
+  Honor host CARGO_HOME and registry settings, including cargo vendor sources.
+* Make package a locked build without APT or source/crate/toolchain updates.
+  Keep source/crate refresh and system-package maintenance explicit and separate.
+* Treat toolchain.lock.json as local host provenance; ignore obsolete nightly
+  selections instead of asking to install or restore a different compiler.
+* Restore missing config.mk.example and add snapshot-dist for the complete source
+  tree without needing Rust/network. Keep the supplied upstream source unchanged.
+* Disable Rust-provisioning in root real-build CI; require a provisioned runner.
+* Expand regression coverage for host discovery, non-mutation, no installer paths,
+  real Make entrypoints, full-source archives, checksums and relocation.
+
+Earlier entries below describe superseded behavior, not 2.2.0 instructions.
+
+
 ## 2.1.0 - 2026-09-15
 
 * Fix fragile top-level imports of latest/debian: load the bundled files directly,

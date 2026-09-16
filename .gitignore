@@ -7,4 +7,5 @@ __pycache__/
 *.pyc
 # Intentionally retain generated provenance when committing a selected build:
 # source.lock.json, source-manifest.json, toolchain.lock.json,
-# toolchain-selection.json, dependency-lock/, latest-resolution.json.
+# dependency-lock/, latest-resolution.json.
+# Legacy toolchain-selection.json is ignored by the host-Rust driver.

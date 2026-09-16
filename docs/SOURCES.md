@@ -1,4 +1,40 @@
-# Primary references reviewed
+# Source basis and reference review
+
+## 2.2.0 host-Rust correction - 2026-09-16
+
+The primary task inputs are the supplied resctl-bench.zip build kit plus upstream
+source snapshot and resctl-bench.txt failure log. The log shows a dated Rustup
+installation followed by rejection of an existing CARGO_HOME/config.toml.
+The upstream source is preserved, not replaced with a newly fetched revision.
+
+Official documentation checked for this correction:
+
+- Rustup automatic-install environment switch and inherited selection:
+  https://rust-lang.github.io/rustup/environment-variables.html
+- Rustup selection/override precedence:
+  https://rust-lang.github.io/rustup/overrides.html
+- Cargo configuration search/precedence:
+  https://doc.rust-lang.org/cargo/reference/config.html
+- Cargo executable and cache environment variables:
+  https://doc.rust-lang.org/cargo/reference/environment-variables.html
+- Cargo vendoring and --respect-source-config:
+  https://doc.rust-lang.org/cargo/commands/cargo-vendor.html
+- Git optional index refresh control for source verification:
+  https://git-scm.com/docs/git-status
+
+RUSTUP_AUTO_INSTALL=0 disables implicit installation; RUSTC/RUSTDOC select the
+concrete executables for Cargo. Configuration is read by Cargo, never rewritten
+by the build kit. Compiler executables and configured tools/build scripts remain
+trusted local programs, not isolated adversarial code.
+
+## Historical references supplied with 2.1.0
+
+The following reference list is retained from the original archive. Its claims
+of prior review are historical and were not all independently revalidated for
+this correction. In particular, no current nightly release or CI action release
+identity is asserted by this edition; the kit no longer resolves/install Rust.
+
+### Original reference list
 
 Review date: 2026-09-15. These references establish upstream interfaces and
 published documentation, not successful compilation in this authoring sandbox.

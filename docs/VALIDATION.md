@@ -1,73 +1,82 @@
-# Validation status - build kit 2.1.0
+# Validation status - build kit 2.2.0 (host Rust)
 
-## Regression fixed
+Validation date: 2026-09-16. This report distinguishes orchestration tests from
+actual Rust compilation. No benchmark, IOCost change, device operation, Rust
+installation, APT installation, or global configuration edit was performed.
 
-The supplied 2.0.0 archive contains scripts/latest.py and scripts/debian.py,
-but the driver imported their names as top-level modules. This depends on
-sys.path and can import an unrelated installed debian package first. Running
-the old driver with PYTHONSAFEPATH=1 reproduced a missing local helper import.
-The exact environmental trigger on the reported user's host is not established
-from the traceback alone. The fix does not require determining that trigger:
-it loads bundled helpers by their explicit paths under private names and uses
-isolated system Python for Makefile and installer/verification subprocesses.
-A truly missing helper gives an explicit incomplete-archive error.
+## Executed checks
 
-## Executed tests
+`make lint test` completed successfully: **99 tests passed**. The actual combined
+stdout/stderr is in `docs/test-results.txt`. Syntax/whitespace checks cover all
+nine Python files in scripts/ and tests/.
 
-Validation date: 2026-09-15 UTC. Authoring host: Debian 13 (Trixie), x86_64.
-This host is not Debian Forky and has no installed Rust toolchain.
+The tests include native host tools without Rustup; PATH precedence; explicit
+executable paths with spaces; standard RUSTC/CARGO/RUSTDOC variables; existing
+Rustup symlink and hardlink proxies; inherited host selection; read-only named
+toolchain queries; disabled automatic installation; missing tools; obsolete
+nightly selections; disabled update targets; and project-local tool provenance.
 
-All **86 tests passed**, with no failures or skips. `make lint` passes syntax
-and whitespace checks for all eight Python source/test files. The suite was
-also rerun from an independently extracted copy of the generated distribution.
-`test-results.txt` contains the captured development-tree run; the extracted
-archive run is supplied as a separate download next to the final archive.
+Pipeline tests run real GNU Make/Python entrypoints, Git operations, C compilation,
+ELF validation, objcopy/strip debug separation, binary/source tar generation,
+checksum verification, installer conflict checks, and source-bundle relocation.
+Rust/Cargo programs in these pipeline tests are **simulated executables**; their
+produced ELF files are tiny C fixtures, not real resctl-bench binaries. Rustup,
+sudo and apt-get fixture traps fail if invoked by ordinary packaging.
 
-New coverage includes:
+A preservation test runs doctor, dependency refresh, Cargo check/test compilation,
+packaging and source vendoring with pre-existing Cargo-home config/config.toml,
+ancestor/project Cargo configurations, Rustup settings, and a shell profile.
+It verifies configuration bytes and modification times are unchanged. It also
+asserts that all simulated Cargo subprocesses receive RUSTUP_AUTO_INSTALL=0,
+concrete host tool paths, and the existing custom CARGO_HOME.
 
-* Actual Makefile subprocesses with -I, PYTHONSAFEPATH, corrupted PYTHONHOME,
-  conflicting external modules, and project-directory names containing spaces.
-* Explicit errors for missing latest.py/debian.py, without ModuleNotFoundError.
-* Plain make selecting package, online/locked/offline target dispatch, automatic
-  rustup discovery, and visible sudo authentication before logged APT execution.
-* The real online Makefile/main/newest sequence with only APT, nightly and Cargo
-  boundaries simulated; it creates a real tarball of explicitly synthetic ELF files.
-* A relocated populated source archive executing make package OFFLINE=1 and
-  make verify through actual subprocesses, producing all expected payload files.
-* Matching debug links, latest archive alias and checksum, and removal of stale
-  success pointers following a failed build.
+The complete-source snapshot test forbids toolchain discovery during archiving,
+checks that the actual workspace implementations, host helper and defaults are
+included, extracts the tarball, verifies source identity, and runs SHA256SUMS.
+It caught an optional Git-index refresh after extraction; the driver now sets
+GIT_OPTIONAL_LOCKS=0 so its read-only source checks do not rewrite that index.
 
-Retained tests cover source locking, recovery and tamper detection; dependency
-lock overlays and update evidence; compiler identity and drift; vendor checks
-and relocation; amd64/arm64/portable flag selection; ELF architecture, PIE,
-RELRO and stack policy; archive normalization; installation path, symlink,
-conflict and modified-uninstall protections; Forky origin/codename selection,
-version comparison, compiler metapackage expansion, localization, no-removal
-and no-cross-suite APT policy; nightly selection, component availability,
-identity checks and channel-race rejection.
+The supplied upstream snapshot was independently checked against its original
+source manifest and ZIP contents: all **163 upstream source files** are preserved.
+The locked commit is `bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b` and the original
+Cargo.lock is unchanged. Minimal Git metadata is retained for build provenance;
+host reflogs, hooks and old local .work logs/caches are not redistributed.
 
-The tests use real local Git, GCC ELF compilation, GNU binutils, archive
-creation/extraction/checksums and filesystem installation/removal. Rustup,
-rustc, Cargo, APT package data, and nightly manifests are SIMULATED. Synthetic
-fixture versions and commit strings are not claims about current releases.
-No generated fixture executable is included in the distributed codebase.
+## What this does not establish
 
-Distribution creation itself checks that the copied driver starts under
-isolated Python and that its syntax/whitespace checks pass. The final archive
-was independently extracted, its SHA256SUMS checked, and its Makefile tests
-executed. This guards the downloadable artifact rather than only a development
-working directory that might conceal missing files or import-path problems.
+This authoring environment is Debian 13 (Trixie) and has no installed rustc,
+Cargo or Rustup. A real upstream Rust compilation/link was **not performed**.
+No Rust toolchain was downloaded or installed to replace that missing prerequisite.
+Fixture success does not establish compatibility with a particular host compiler,
+all configured registry mirrors, the full real Cargo dependency graph, or every
+possible user wrapper/configuration. Existing configured tools and upstream
+build scripts are trusted code executed with the build user's permissions.
 
-## Not verified here
+The delivered complete-project source archive does **not** contain vendored
+third-party Cargo crates: those sources were absent from the supplied ZIP.
+A real first build therefore requires registry access or an existing dependency
+cache. Offline mode needs cached or previously vendored dependencies. Missing
+or incompatible host Rust fails without installing a replacement.
 
-A network attempt to github.com failed with DNS resolution error. Rust/rustup
-are not installed in the authoring sandbox. Therefore no real current upstream
-Rust compilation, live nightly installation, Forky APT transaction, real
-resctl CLI smoke run, benchmark, hardware tuning or IOCost calibration has been
-executed here. The opt-in Forky CI build has not been run either. ARM flag data
-is tested, not executed on ARM hardware.
+No live Forky APT transaction, real-upstream CI job, AWS workflow, or IOCost
+benchmark was run. Root CI no longer provisions Rust; its real-build job requires
+a provisioned self-hosted runner. The upstream nested Lambda workflow is retained
+as pristine upstream source and is not part of root Make/build-kit execution.
+The original CI action pins are retained, not newly verified release assertions.
 
-This download is the build-and-packaging implementation. A networked Forky host
-with the user's existing rustup is required for the real `make package` build.
-Only successful compilation, ELF validation, smoke checks and packaging publish
-a binary archive. No silent old-nightly fallback or pretend binary is used.
+## Reproduce on the intended host
+
+From a fresh extraction as the ordinary host user:
+
+```sh
+sha256sum -c SHA256SUMS
+make lint test
+make doctor
+make package
+make verify
+```
+
+Use explicit HOST_RUSTC/HOST_CARGO/HOST_RUSTDOC paths when PATH does not identify
+the desired already-installed tools. Read README.md for configuration and host
+requirements. Never interpret a CLI smoke pass as permission to run workloads
+against an unreviewed scratch device or production host.

@@ -56,33 +56,33 @@ def _load_helper(name: str) -> Any:
 
 
 debian = _load_helper("debian")
-latest = _load_helper("latest")
+host_rust = _load_helper("host_rust")
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 ROOT = Path(__file__).resolve().parents[1]
 GIB = 1024**3
 BASE_BINS = ("resctl-bench", "rd-agent", "rd-hashd")
 KIT_ITEMS = ("Makefile", "README.md", "LICENSE", "NOTICE.md", ".gitignore",
              ".editorconfig", "config.mk.example", "scripts", "tests", "docs",
              "packages", ".github", "CHANGELOG.md")
-HELP = """resctl-bench-buildkit 2.1.0 (Debian Forky, native amd64/arm64 GNU/Linux)
+HELP = """resctl-bench-buildkit 2.2.0 (Debian Forky, native amd64/arm64 GNU/Linux)
 
-  make                  Same as make package (one-command online build)
-  make package          Forky deps + latest main/nightly/compatible crates + binary tarball
-  make latest           Compatibility alias for make package
+  make                  Same as make package (host Rust; locked source)
+  make package          Build locked sources with host Rust; no APT or toolchain changes
+  make latest           Explicitly update source/crates, then package with host Rust
   make latest-complete  Same, plus populated source tarball with vendored crates
   make deps             Install newest declared build packages from Forky (sudo for APT)
   make deps-plan        Simulate the Forky dependency transaction using current indexes
   make deps-runtime     Explicitly install runtime packages (may start distro services)
   make deps-llvm        Optional newest Forky LLVM/bindgen development packages
-  make update-toolchain Resolve official nightly; install exact dated minimal toolchain
-  make update-rustup    Explicitly update rustup itself (not run by ordinary builds)
+  make update-toolchain DISABLED: this kit never installs or updates Rust
+  make update-rustup    DISABLED: this kit never installs or updates rustup
   make update-deps      Resolve newest compatible crates into a separate, audited lock
   make versions         Show source/toolchain/dependency locks and local package versions
   make doctor           Validate installed compiler, host, tools and flags
   make fetch            Fetch once; lock Git commit and all source file hashes
   make update-source    Explicitly move source lock to UPSTREAM_REF (clean only)
-  make lock-toolchain   Explicitly accept the current installed Rust compiler
+  make lock-toolchain   Record current host compiler identity (project-local metadata)
   make fetch-deps       Download dependencies without changing Cargo.lock
   make build            Build resctl-bench, rd-agent, rd-hashd, resctl-demo
   make check            Cargo check selected packages with --locked
@@ -94,6 +94,7 @@ HELP = """resctl-bench-buildkit 2.1.0 (Debian Forky, native amd64/arm64 GNU/Linu
   make verify           Verify hashes of the most recently packaged release
   make vendor           Vendor the entire locked Cargo dependency graph
   make source-dist      Bundle this kit + locked upstream + vendored crates
+  make snapshot-dist    Bundle complete selected source; no Rust/network required
   make kit-dist         Bundle build-kit code only (no network or Rust needed)
   make test             Run build-kit unit/integration tests (no Rust required)
   make lint             Check Python syntax and whitespace
@@ -104,9 +105,11 @@ HELP = """resctl-bench-buildkit 2.1.0 (Debian Forky, native amd64/arm64 GNU/Linu
   make clean-vendor     Remove the kit-generated vendor tree only
 
 Configuration: config.mk.example or make VAR=value.
-  TOOLCHAIN=nightly TUNE=native|portable LTO=thin|fat|off JOBS=auto|N
+  TOOLCHAIN=host TUNE=native|portable LTO=thin|fat|off JOBS=auto|N
+  HOST_RUSTC= HOST_CARGO= HOST_RUSTDOC= (optional installed executable paths)
   WITH_DEMO=1 SPLIT_DEBUG=1 OFFLINE=0 HOST_CC=/usr/bin/gcc HOST_CXX=/usr/bin/g++
-  OFFLINE=1 skips updates and packages the already provisioned, locked build
+  OFFLINE=1 requires cached/vendored crates; never installs missing Rust
+  CARGO_HOME is honored; existing Cargo configurations are read, never rewritten
   PREFIX=/usr/local DESTDIR= FORCE=0
   UPSTREAM_URL=https://github.com/facebookexperimental/resctl-demo.git
   UPSTREAM_REF=main (only initial fetch/update; then the full SHA is locked)
@@ -327,6 +330,9 @@ class Config:
     extra_rust: tuple[str, ...]
     extra_c: tuple[str, ...]
     extra_cxx: tuple[str, ...]
+    host_rustc: str
+    host_cargo: str
+    host_rustdoc: str
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Config:
@@ -351,12 +357,20 @@ class Config:
             raise BuildError("JOBS must be auto or a positive integer") from exc
         if not 1 <= jobs <= 4096:
             raise BuildError("JOBS must be between 1 and 4096")
-        return cls(url, ref, e.get("TOOLCHAIN", "nightly"), tune, lto, jobs,
+        selection = e.get("TOOLCHAIN", "host")
+        try:
+            host_rust.validate_selection(selection)
+        except host_rust.HostRustError as exc:
+            raise BuildError(str(exc)) from exc
+        return cls(url, ref, selection, tune, lto, jobs,
                    boolean(e, "WITH_DEMO", "1"), boolean(e, "SPLIT_DEBUG", "1"),
                    boolean(e, "OFFLINE", "0"), e.get("HOST_CC", "/usr/bin/gcc"), e.get("HOST_CXX", "/usr/bin/g++"),
                    tuple(shlex.split(e.get("EXTRA_RUSTFLAGS", ""))),
                    tuple(shlex.split(e.get("EXTRA_CFLAGS", ""))),
-                   tuple(shlex.split(e.get("EXTRA_CXXFLAGS", ""))))
+                   tuple(shlex.split(e.get("EXTRA_CXXFLAGS", ""))),
+                   e.get("HOST_RUSTC") or e.get("RUSTC", ""),
+                   e.get("HOST_CARGO") or e.get("CARGO", ""),
+                   e.get("HOST_RUSTDOC") or e.get("RUSTDOC", ""))
 
     @property
     def binaries(self) -> tuple[str, ...]:
@@ -380,24 +394,6 @@ def compilation_flags(cfg: Config, host: str, root: Path, cargo_home: Path) -> t
     return rust + list(cfg.extra_rust), cflags + list(cfg.extra_c), cflags + list(cfg.extra_cxx)
 
 
-def rustup_environment(environment: Mapping[str, str]) -> dict[str, str]:
-    """Find the existing rustup, including installs not exported in the shell PATH."""
-    env = dict(environment)
-    path = env.get("PATH", os.defpath)
-    if shutil.which("rustup", path=path):
-        return env
-    homes = []
-    if env.get("CARGO_HOME"):
-        homes.append(Path(env["CARGO_HOME"]).expanduser())
-    homes.append(Path(env.get("HOME", str(Path.home()))) / ".cargo")
-    for home in homes:
-        binary = home / "bin" / "rustup"
-        if binary.is_file() and os.access(binary, os.X_OK):
-            env["PATH"] = str(binary.parent.resolve()) + os.pathsep + path
-            return env
-    return env
-
-
 class Builder:
     def __init__(self, root: Path, cfg: Config):
         self.root, self.cfg = root.resolve(), cfg
@@ -406,20 +402,31 @@ class Builder:
         self.dist = self.root / "dist"
         self.vendor_dir = self.root / "vendor"
         self.dependency_dir = self.root / "dependency-lock"
-        self.cargo_home = Path(os.environ.get("CARGO_HOME", str(self.work / "cargo-home"))).expanduser().resolve()
+        if self.work.is_symlink():
+            raise BuildError("Refuse a symlinked .work directory; generated state must stay inside the project")
+        home = Path(os.environ.get("CARGO_HOME") or str(Path.home() / ".cargo")).expanduser()
+        self.cargo_home = (home if home.is_absolute() else self.root / home).resolve()
         self._tools: dict[str, str] | None = None
 
     def effective_toolchain(self) -> str:
-        return latest.selected_toolchain(self.root, self.cfg.toolchain)
+        # Legacy toolchain-selection.json is deliberately never consulted.
+        return self.cfg.toolchain
 
     def environment(self) -> dict[str, str]:
-        env = rustup_environment(os.environ)
+        env = dict(os.environ)
         for key in list(env):
             if key.startswith("VERGEN_") or key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"):
                 env.pop(key, None)
         env.update(LC_ALL="C", LANG="C", TZ="UTC", CARGO_TERM_COLOR="never",
-                   RUSTUP_AUTO_INSTALL="0", RUSTUP_TOOLCHAIN=self.effective_toolchain(),
-                   GIT_TERMINAL_PROMPT="0", CARGO_HOME=str(self.cargo_home))
+                   RUSTUP_AUTO_INSTALL="0",
+                   GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0", CARGO_HOME=str(self.cargo_home))
+        if self.cfg.toolchain != "host":
+            env["RUSTUP_TOOLCHAIN"] = self.cfg.toolchain
+        if self._tools is not None:
+            # Subprocesses and build scripts get the same concrete host tools.
+            env.update(RUSTC=self._tools["rustc"], RUSTDOC=self._tools["rustdoc"], CARGO=self._tools["cargo"])
+            bins = list(dict.fromkeys(str(Path(self._tools[name]).parent) for name in ("cargo", "rustc", "rustdoc")))
+            env["PATH"] = os.pathsep.join([*bins, env.get("PATH", os.defpath)])
         return env
 
     def git(self, *args: str, cwd: Path | None = None) -> str:
@@ -506,15 +513,14 @@ class Builder:
         if self._tools is not None and not refresh:
             return self._tools
         debian.require_forky()
-        self.reject_shadow_configuration()
-        required = ("rustup", "git", "pkg-config", "readelf", "objcopy", "strip", self.cfg.cc, self.cfg.cxx)
+        required = ("git", "pkg-config", "readelf", "objcopy", "strip", self.cfg.cc, self.cfg.cxx)
         tool_env = self.environment()
         missing = [name for name in required if not shutil.which(name, path=tool_env.get("PATH"))]
         if missing:
-            raise BuildError("Missing tools: " + ", ".join(missing) + ". Use make deps; Rust must already be installed with rustup.")
+            raise BuildError("Missing tools: " + ", ".join(missing) + ". Install prerequisites explicitly; make deps changes APT packages only when requested.")
         for key, value in os.environ.items():
             if value and (key in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CFLAGS", "CXXFLAGS", "LDFLAGS",
-                                  "RUSTC", "RUSTDOC", "RUSTC_BOOTSTRAP", "RUSTC_LINKER", "CARGO_BUILD_BUILD_DIR",
+                                  "RUSTC_BOOTSTRAP", "RUSTC_LINKER", "CARGO_BUILD_BUILD_DIR",
                                   "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER", "CARGO_BUILD_RUSTFLAGS",
                                   "CARGO_BUILD_TARGET", "CARGO_TARGET_DIR")
                           or key.startswith("CARGO_PROFILE_") or key.startswith("CARGO_TARGET_")
@@ -523,9 +529,10 @@ class Builder:
                                      "TARGET_AR", "HOST_AR", "AR", "ARFLAGS", "CRATE_CC_NO_DEFAULTS")):
                 raise BuildError(f"Ambient {key} makes the build ambiguous. Unset it; use documented kit options/EXTRA_*FLAGS.")
         env = self.environment()
-        paths = {name: run(["rustup", "which", "--toolchain", self.effective_toolchain(), name],
-                          env=env, timeout=30, quiet=True).strip()
-                 for name in ("rustc", "cargo", "rustdoc")}
+        paths = host_rust.discover(self.cfg.toolchain,
+                                   {"rustc": self.cfg.host_rustc, "cargo": self.cfg.host_cargo,
+                                    "rustdoc": self.cfg.host_rustdoc},
+                                   os.environ, self.root, run)
         vv = run([paths["rustc"], "-vV"], env=env, timeout=30, quiet=True)
         cargo_v = run([paths["cargo"], "--version"], env=env, timeout=30, quiet=True).strip()
         match = re.search(r"^host: (.+)$", vv, re.M)
@@ -533,27 +540,29 @@ class Builder:
             raise BuildError("rustc -vV did not report a host triple")
         host = match[1]
         compilation_flags(self.cfg, host, self.root, self.cargo_home)
-        locked = {"schema": 1, "requested_toolchain": self.cfg.toolchain, "resolved_toolchain": self.effective_toolchain(),
-                  "rustc_vv": vv, "cargo_version": cargo_v}
+        locked = {"schema": 2, "policy": "host-installed-only",
+                  "requested_toolchain": self.cfg.toolchain, "resolved_toolchain": self.effective_toolchain(),
+                  "rustc_vv": vv, "cargo_version": cargo_v, "executables": paths.copy()}
         path = self.root / "toolchain.lock.json"
-        if path.exists() and not refresh and read_json(path) != locked:
-            raise BuildError("Installed compiler differs from toolchain.lock.json. Restore that toolchain or explicitly run make lock-toolchain.")
-        if self.cfg.toolchain == "nightly" and (self.root / "toolchain-selection.json").exists():
-            latest.verify_compiler(read_json(self.root / "toolchain-selection.json"), vv)
-        if not path.exists() or refresh:
+        # Provenance, not a request to restore/install a former compiler. A host
+        # upgrade changes the build identity naturally; no global setting moves.
+        if not path.exists() or read_json(path) != locked or refresh:
             write_json(path, locked)
         paths.update(host=host, rustc_vv=vv, cargo_version=cargo_v)
         self._tools = paths
         return paths
 
-    def reject_shadow_configuration(self) -> None:
+    def cargo_configuration_fingerprints(self, source: Path) -> dict[str, str]:
+        """Record direct Cargo config inputs, without copying content or credentials.
+
+        Cargo may read additional include files or environment settings; this is
+        provenance, not a claim of a hermetic build. Existing user configuration
+        is trusted input and is never deleted, replaced or rewritten by the kit.
+        """
         candidates = {self.cargo_home / "config", self.cargo_home / "config.toml"}
-        for parent in (self.src, self.root, *self.root.parents):
+        for parent in (source, *source.parents):
             candidates.update((parent / ".cargo/config", parent / ".cargo/config.toml"))
-        present = sorted(str(p) for p in candidates if p.exists())
-        if present:
-            raise BuildError("Cargo configuration could override controlled settings: " + ", ".join(present)
-                             + ". Move the kit outside configured parent workspaces or use an isolated CARGO_HOME.")
+        return {str(p): digest(p) for p in sorted(candidates) if p.is_file()}
 
     def copy_source(self, destination: Path) -> None:
         """Copy actual source and a minimal Git identity; never fabricate a commit."""
@@ -619,8 +628,8 @@ class Builder:
         self.assert_build_user()
         if self.cfg.offline:
             raise BuildError("update-deps must be online; an offline resolver cannot establish newest versions")
-        source = self.fetch()
         tools = self.tools()
+        source = self.fetch()
         if self.dependency_dir.exists():
             self.verify_dependency_lock()
         if self.vendor_dir.exists():
@@ -662,35 +671,13 @@ class Builder:
         print("Newest compatible dependency resolution recorded; upstream Cargo.toml and Cargo.lock remain unchanged")
 
     def update_toolchain(self) -> None:
-        self.assert_build_user()
-        debian.require_forky()
-        if self.cfg.offline or self.cfg.toolchain != "nightly":
-            raise BuildError("update-toolchain requires OFFLINE=0 TOOLCHAIN=nightly")
-        arch = run(["dpkg", "--print-architecture"], quiet=True).strip()
-        hosts = {"amd64": "x86_64-unknown-linux-gnu", "arm64": "aarch64-unknown-linux-gnu"}
-        if arch not in hosts:
-            raise BuildError(f"Unsupported Debian architecture: {arch}")
-        selection = latest.parse_manifest(latest.download_manifest(), hosts[arch])
-        name = selection["resolved_toolchain"]
-        env = self.environment()
-        run(["rustup", "toolchain", "install", name, "--profile", "minimal", "--no-self-update"],
-            env=env, log=self.work / "logs/rustup-nightly.log")
-        compiler = run(["rustup", "which", "--toolchain", name, "rustc"], env=env, quiet=True).strip()
-        vv = run([compiler, "-vV"], env=env, quiet=True)
-        latest.verify_compiler(selection, vv)
-        # A channel update during installation should not be described as latest.
-        after = latest.parse_manifest(latest.download_manifest(), hosts[arch])
-        if (after["manifest_date"], after["rustc_commit"]) != (selection["manifest_date"], selection["rustc_commit"]):
-            raise BuildError("Nightly advanced during installation; rerun update-toolchain instead of publishing stale resolution")
-        write_json(self.root / "toolchain-selection.json", selection)
-        self._tools = None
-        self.tools(refresh=True)
-        print(f"Selected {name}; rustup's global default and existing nightly alias were not changed")
+        raise BuildError("update-toolchain is disabled: this kit uses only already-installed host Rust. "
+                         "Use make lock-toolchain to record host versions; it installs nothing.")
 
     def versions(self) -> None:
         report = {"kit_version": VERSION, "host": debian.host_release(),
                   "installed_packages": debian.installed_versions(run)}
-        for filename in ("source.lock.json", "toolchain.lock.json", "toolchain-selection.json",
+        for filename in ("source.lock.json", "toolchain.lock.json",
                          "dependency-lock/manifest.json", "latest-resolution.json"):
             if (self.root / filename).exists():
                 report[filename] = read_json(self.root / filename)
@@ -699,33 +686,30 @@ class Builder:
     def newest(self, complete: bool = False) -> None:
         self.assert_build_user()
         debian.require_forky(allow_override=False)
-        if not shutil.which("rustup", path=self.environment().get("PATH")):
-            raise BuildError("Existing rustup not found in PATH, $CARGO_HOME/bin, or $HOME/.cargo/bin. "
-                             "Run as the user who owns your rustup installation.")
-        if self.cfg.offline or self.cfg.ref != "main" or self.cfg.toolchain != "nightly":
-            raise BuildError("latest requires online UPSTREAM_REF=main TOOLCHAIN=nightly")
+        if self.cfg.offline or self.cfg.ref != "main":
+            raise BuildError("latest requires online UPSTREAM_REF=main; Rust is always host-installed")
+        self.tools()  # Fail before changing source/dependency selections if Rust is missing.
         self.invalidate_package()
         (self.root / "latest-resolution.json").unlink(missing_ok=True)
         if self.src.exists():
-            self.verify_source()  # Reject edits before changing system packages or tools.
-        debian.install_dependencies(self.root, "build", run, write_json)
+            self.verify_source()  # Reject edits before changing the selected source/dependencies.
         self.fetch(update=True)
-        self.update_toolchain()
         self.update_dependencies()
         self.doctor()
         write_json(self.root / "latest-resolution.json", {
-            "schema": 1, "resolved_at_utc": datetime.now(timezone.utc).isoformat(),
-            "source": self.verify_source(), "toolchain": read_json(self.root / "toolchain-selection.json"),
-            "dependencies": self.verify_dependency_lock(), "apt": read_json(self.work / "apt-build.json"),
-            "scope": "newest main, published nightly and compatible crates at resolution time; newest declared Forky build packages",
-            "not_in_scope": ["kernel upgrade", "firmware", "breaking dependency migrations", "benchmark execution"]})
+            "schema": 2, "resolved_at_utc": datetime.now(timezone.utc).isoformat(),
+            "source": self.verify_source(), "toolchain": read_json(self.root / "toolchain.lock.json"),
+            "dependencies": self.verify_dependency_lock(), "installed_packages": debian.installed_versions(run),
+            "scope": "current main and compatible crates at resolution time, using unchanged host-installed Rust",
+            "not_in_scope": ["Rust installation/update", "APT changes", "global configuration changes",
+                             "kernel upgrade", "firmware", "breaking dependency migrations", "benchmark execution"]})
         self.package()
         if complete:
             self.source_dist()
 
     def assert_build_user(self) -> None:
         if os.geteuid() == 0 and os.environ.get("ALLOW_ROOT_BUILD") != "1":
-            raise BuildError("Do not compile as root. Use your rustup-owning user. ALLOW_ROOT_BUILD=1 is an explicit container/CI override.")
+            raise BuildError("Do not compile as root. Use your ordinary host user. ALLOW_ROOT_BUILD=1 is an explicit container/CI override.")
 
     def verify_vendor(self) -> dict[str, Any]:
         info = read_json(self.vendor_dir / "manifest.json")
@@ -755,8 +739,8 @@ class Builder:
 
     def cargo_context(self) -> tuple[dict[str, str], dict[str, Any]]:
         self.assert_build_user()
-        lock = self.fetch()
         tools = self.tools()
+        lock = self.fetch()
         active_source = self.effective_source()
         rust, c, cxx = compilation_flags(self.cfg, tools["host"], self.root, self.cargo_home)
         env = self.environment()
@@ -766,7 +750,7 @@ class Builder:
         epoch = int(os.environ.get("SOURCE_DATE_EPOCH", lock["commit_epoch"]))
         if not 0 <= epoch <= 0xFFFFFFFF:
             raise BuildError("Invalid SOURCE_DATE_EPOCH")
-        env.update(RUSTC=tools["rustc"], RUSTDOC=tools["rustdoc"], RUSTUP_TOOLCHAIN=self.effective_toolchain(),
+        env.update(RUSTC=tools["rustc"], RUSTDOC=tools["rustdoc"], CARGO=tools["cargo"],
                    CARGO_ENCODED_RUSTFLAGS="\x1f".join(rust),
                    CFLAGS=shlex.join(c), CXXFLAGS=shlex.join(cxx), CC=cc, CXX=cxx_bin,
                    HOST_CC=cc, HOST_CXX=cxx_bin, TARGET_CC=cc, TARGET_CXX=cxx_bin,
@@ -805,6 +789,9 @@ class Builder:
                     "binaries": list(self.cfg.binaries), "split_debug": self.cfg.split_debug,
                     "source_date_epoch": epoch,
                     "driver_sha256": digest(self.root / "scripts" / "build.py"),
+                    "host_rust_helper_sha256": digest(self.root / "scripts" / "host_rust.py"),
+                    "rust_executables": {name: tools[name] for name in ("rustc", "cargo", "rustdoc")},
+                    "cargo_configuration_sha256": self.cargo_configuration_fingerprints(active_source),
                     "kit_scripts": {p.name: digest(p) for p in sorted((self.root / "scripts").glob("*.py"))},
                     "installed_debian_packages": debian.installed_versions(run),
                     "os_release": Path("/etc/os-release").read_text(),
@@ -830,16 +817,17 @@ class Builder:
         self.assert_build_user()
         tools = self.tools()
         rust, c, cxx = compilation_flags(self.cfg, tools["host"], self.root, self.cargo_home)
+        env = self.environment()
         with tempfile.TemporaryDirectory(prefix="resctl-probe-") as temp:
             p = Path(temp)
             (p / "probe.rs").write_text('fn main() { println!("rust/linker probe OK"); }\n')
             (p / "probe.c").write_text('int main(void) { return 0; }\n')
             run([tools["rustc"], p / "probe.rs", "--target", tools["host"], *rust,
-                 f"-Clinker={shutil.which(self.cfg.cc)}", "-o", p / "rust-probe"], timeout=60)
-            run([self.cfg.cc, *c, p / "probe.c", "-o", p / "c-probe"], timeout=60)
-            run([self.cfg.cxx, *cxx, "-x", "c++", p / "probe.c", "-o", p / "cxx-probe"], timeout=60)
+                 f"-Clinker={shutil.which(self.cfg.cc)}", "-o", p / "rust-probe"], env=env, timeout=60)
+            run([self.cfg.cc, *c, p / "probe.c", "-o", p / "c-probe"], env=env, timeout=60)
+            run([self.cfg.cxx, *cxx, "-x", "c++", p / "probe.c", "-o", p / "cxx-probe"], env=env, timeout=60)
             for name in ("rust-probe", "c-probe", "cxx-probe"):
-                run([p / name], timeout=10)
+                run([p / name], env=env, timeout=10)
         print(json.dumps({"host": tools["host"], "toolchain": tools["cargo_version"],
                           "tuning": self.cfg.tune, "jobs": self.cfg.jobs,
                           "rustflags": rust, "cflags": c}, indent=2))
@@ -973,7 +961,7 @@ class Builder:
             shutil.copyfile(self.src / "Cargo.lock", provenance / "Cargo.lock.upstream")
             if self.dependency_dir.exists():
                 shutil.copytree(self.dependency_dir, provenance / "dependency-update")
-            for filename in ("toolchain-selection.json", "latest-resolution.json"):
+            for filename in ("latest-resolution.json",):
                 if (self.root / filename).exists():
                     shutil.copyfile(self.root / filename, provenance / filename)
             for filename in ("apt-build.json", "apt-runtime.json", "apt-llvm.json"):
@@ -1028,7 +1016,7 @@ class Builder:
             tree = Path(temp) / "vendor"
             crates = tree / "crates"
             output = run([self.tools()["cargo"], "vendor", "--manifest-path", self.effective_source() / "Cargo.toml",
-                          "--frozen" if self.cfg.offline else "--locked", "--versioned-dirs", crates],
+                          "--frozen" if self.cfg.offline else "--locked", "--respect-source-config", "--versioned-dirs", crates],
                          cwd=self.effective_source(), env=env)
             sources = tomllib.loads(output).get("source")
             if not sources:
@@ -1059,6 +1047,45 @@ class Builder:
                 cwd=destination, timeout=30, quiet=True)
         (destination / ".buildkit.lock").unlink(missing_ok=True)
 
+    def snapshot_dist(self) -> Path:
+        """Archive all selected project sources without Rust, downloads or vendoring.
+
+        Unlike kit-dist this includes the complete locked upstream implementation.
+        Unlike source-dist it does not require Cargo or promise offline crates.
+        """
+        lock = self.verify_source()
+        if self.dependency_dir.exists():
+            self.verify_dependency_lock()
+        if self.vendor_dir.exists():
+            self.verify_vendor()
+        name = f"resctl-bench-buildkit-{VERSION}-host-rust"
+        self.work.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="snapshot-dist-", dir=self.work) as temp:
+            tree = Path(temp) / name
+            self.copy_kit(tree)
+            # Ship reviewed defaults, never a user's executable/private Make config.
+            shutil.copyfile(tree / "config.mk.example", tree / "config.mk")
+            self.copy_source(tree / "upstream")
+            for filename in ("source.lock.json", "source-manifest.json"):
+                shutil.copyfile(self.root / filename, tree / filename)
+            for dirname in ("dependency-lock", "vendor"):
+                if (self.root / dirname).exists():
+                    shutil.copytree(self.root / dirname, tree / dirname)
+            write_json(tree / "source-snapshot.json", {
+                "schema": 1, "kind": "complete-project-source-snapshot",
+                "kit_version": VERSION, "source_commit": lock["commit"],
+                "upstream_files": len(read_json(self.root / "source-manifest.json")),
+                "vendored_dependencies": self.vendor_dir.exists(),
+                "rust_policy": "host-installed-only", "contains_compiled_binaries": False,
+                "configuration": "config.mk contains shipped defaults, not the source host's overrides"})
+            Builder(tree, self.cfg).verify_source()
+            checksums(tree)
+            epoch = int(os.environ.get("SOURCE_DATE_EPOCH", lock["commit_epoch"]))
+            destination = self.dist / (name + ".tar.gz")
+            make_archive(tree, destination, epoch)
+        print(destination)
+        return destination
+
     def source_dist(self, kit_only: bool = False) -> Path:
         lock = None
         if not kit_only:
@@ -1086,7 +1113,7 @@ class Builder:
                 self.copy_source(tree / "upstream")
                 if self.dependency_dir.exists():
                     shutil.copytree(self.dependency_dir, tree / "dependency-lock")
-                for filename in ("toolchain-selection.json", "latest-resolution.json"):
+                for filename in ("latest-resolution.json",):
                     if (self.root / filename).exists():
                         shutil.copyfile(self.root / filename, tree / filename)
                 Builder(tree, self.cfg).verify_source()
@@ -1170,11 +1197,7 @@ def main() -> int:
         elif action == "update-toolchain":
             builder.update_toolchain()
         elif action == "update-rustup":
-            builder.assert_build_user()
-            if cfg.offline:
-                raise BuildError("update-rustup requires online operation")
-            run(["rustup", "self", "update"], env=builder.environment(),
-                log=builder.work / "logs/rustup-self-update.log")
+            raise BuildError("update-rustup is disabled: this kit never installs or updates rustup or Rust")
         elif action == "update-deps":
             builder.update_dependencies()
         elif action == "versions":
@@ -1200,14 +1223,13 @@ def main() -> int:
             stage, _ = builder.stage()
             print(stage)
         elif action == "package":
-            if cfg.offline:
-                builder.package()
-            else:
-                builder.newest()
+            builder.package()
         elif action == "rebuild":
             builder.package()
         elif action == "vendor":
             builder.vendor()
+        elif action == "snapshot-dist":
+            builder.snapshot_dist()
         elif action in ("source-dist", "kit-dist"):
             builder.source_dist(kit_only=action == "kit-dist")
         elif action == "verify":
@@ -1245,7 +1267,7 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except (BuildError, debian.DebianError, latest.LatestError, OSError, ValueError, KeyError) as exc:
+    except (BuildError, debian.DebianError, host_rust.HostRustError, OSError, ValueError, KeyError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         if os.environ.get("BUILDKIT_TRACEBACK") == "1":
             raise

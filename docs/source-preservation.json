@@ -1,0 +1,25 @@
+{
+  "all_upstream_file_bytes_unchanged": true,
+  "cargo_lock_sha256": "fff9f4c6aed12b24be9533907308943b06027e534f8e9466dccd2904831d23a7",
+  "excluded_original_local_state": [
+    ".work/",
+    ".buildkit.lock",
+    "toolchain-selection.json"
+  ],
+  "original_zip_sha256": "0f3c990226936573c857340ce921d9258d7127462fea7dc60e0695b74aaa8063",
+  "real_rust_compilation_performed": false,
+  "replaced_obsolete_helper": {
+    "added": "scripts/host_rust.py",
+    "removed": "scripts/latest.py"
+  },
+  "source_commit": "bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b",
+  "tests": {
+    "count": 99,
+    "git_make_c_elf_packaging": "real",
+    "rust_cargo": "simulated",
+    "status": "passed"
+  },
+  "upstream_file_count": 163,
+  "validation_date": "2026-09-16",
+  "vendored_third_party_crates": false
+}
