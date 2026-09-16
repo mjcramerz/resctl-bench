@@ -6,6 +6,7 @@
     ".buildkit.lock",
     "toolchain-selection.json"
   ],
+  "kit_version": "2.2.1",
   "original_zip_sha256": "0f3c990226936573c857340ce921d9258d7127462fea7dc60e0695b74aaa8063",
   "real_rust_compilation_performed": false,
   "replaced_obsolete_helper": {
@@ -14,7 +15,7 @@
   },
   "source_commit": "bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b",
   "tests": {
-    "count": 99,
+    "count": 116,
     "git_make_c_elf_packaging": "real",
     "rust_cargo": "simulated",
     "status": "passed"

@@ -58,14 +58,14 @@ def _load_helper(name: str) -> Any:
 debian = _load_helper("debian")
 host_rust = _load_helper("host_rust")
 
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 ROOT = Path(__file__).resolve().parents[1]
 GIB = 1024**3
 BASE_BINS = ("resctl-bench", "rd-agent", "rd-hashd")
 KIT_ITEMS = ("Makefile", "README.md", "LICENSE", "NOTICE.md", ".gitignore",
              ".editorconfig", "config.mk.example", "scripts", "tests", "docs",
              "packages", ".github", "CHANGELOG.md")
-HELP = """resctl-bench-buildkit 2.2.0 (Debian Forky, native amd64/arm64 GNU/Linux)
+HELP = """resctl-bench-buildkit 2.2.1 (Debian Forky, native amd64/arm64 GNU/Linux)
 
   make                  Same as make package (host Rust; locked source)
   make package          Build locked sources with host Rust; no APT or toolchain changes
@@ -110,6 +110,8 @@ Configuration: config.mk.example or make VAR=value.
   WITH_DEMO=1 SPLIT_DEBUG=1 OFFLINE=0 HOST_CC=/usr/bin/gcc HOST_CXX=/usr/bin/g++
   OFFLINE=1 requires cached/vendored crates; never installs missing Rust
   CARGO_HOME is honored; existing Cargo configurations are read, never rewritten
+  Ambient build overrides are scoped away in child processes, never rejected
+  CARGO_TARGET_DIR/build-dir overrides do not redirect project output from .work/
   PREFIX=/usr/local DESTDIR= FORCE=0
   UPSTREAM_URL=https://github.com/facebookexperimental/resctl-demo.git
   UPSTREAM_REF=main (only initial fetch/update; then the full SHA is locked)
@@ -394,6 +396,42 @@ def compilation_flags(cfg: Config, host: str, root: Path, cargo_home: Path) -> t
     return rust + list(cfg.extra_rust), cflags + list(cfg.extra_c), cflags + list(cfg.extra_cxx)
 
 
+# These inputs conflict with the kit's native-target/profile/flags/output contract.
+# They are NOT invalid host settings: ignore them in a COPY of the environment,
+# rather than asking users to unset them or edit their global configuration.
+# Keep Cargo home, registries, credentials, mirrors, proxies and Rust selectors.
+CONTROLLED_BUILD_VARIABLES = frozenset({
+    "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_RUSTFLAGS",
+    "RUSTDOCFLAGS", "CARGO_ENCODED_RUSTDOCFLAGS", "CARGO_BUILD_RUSTDOCFLAGS",
+    "CFLAGS", "CXXFLAGS", "CPPFLAGS", "LDFLAGS",
+    "RUSTC_BOOTSTRAP", "RUSTC_LINKER", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER",
+    "CARGO_BUILD_RUSTC_WRAPPER", "CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER",
+    "CARGO_BUILD_TARGET", "CARGO_TARGET_DIR", "CARGO_BUILD_TARGET_DIR",
+    "CARGO_BUILD_BUILD_DIR", "CARGO_INCREMENTAL", "CARGO_BUILD_INCREMENTAL",
+    "TARGET_CFLAGS", "HOST_CFLAGS", "TARGET_CXXFLAGS", "HOST_CXXFLAGS",
+    "TARGET_AR", "HOST_AR", "AR", "ARFLAGS", "CRATE_CC_NO_DEFAULTS",
+})
+
+
+def controlled_build_variable(key: str) -> bool:
+    """Return whether a host environment setting is replaced for this build."""
+    return (key in CONTROLLED_BUILD_VARIABLES
+            or key.startswith(("CARGO_PROFILE_", "CARGO_TARGET_"))
+            or bool(re.match(r"^(CFLAGS|CXXFLAGS|CPPFLAGS|CC|CXX|AR|ARFLAGS)_", key)))
+
+
+def cargo_output_environment(env: dict[str, str], target: Path) -> None:
+    """Keep Cargo's final AND intermediate outputs inside the selected local tree.
+
+    Cargo supports both target-dir names. Newer Cargo also has a separate
+    build-dir setting; overriding it prevents global config from redirecting
+    intermediates to a shared cache. Older Cargo ignores the unused setting.
+    Only the supplied child-process dictionary is changed.
+    """
+    env.update(CARGO_TARGET_DIR=str(target), CARGO_BUILD_TARGET_DIR=str(target),
+               CARGO_BUILD_BUILD_DIR=str(target))
+
+
 class Builder:
     def __init__(self, root: Path, cfg: Config):
         self.root, self.cfg = root.resolve(), cfg
@@ -407,24 +445,31 @@ class Builder:
         home = Path(os.environ.get("CARGO_HOME") or str(Path.home() / ".cargo")).expanduser()
         self.cargo_home = (home if home.is_absolute() else self.root / home).resolve()
         self._tools: dict[str, str] | None = None
+        self._environment_notice_shown = False
 
     def effective_toolchain(self) -> str:
         # Legacy toolchain-selection.json is deliberately never consulted.
         return self.cfg.toolchain
 
     def environment(self) -> dict[str, str]:
-        env = dict(os.environ)
+        env = {key: value for key, value in os.environ.items()
+               if not controlled_build_variable(key)}
         for key in list(env):
             if key.startswith("VERGEN_") or key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"):
                 env.pop(key, None)
         env.update(LC_ALL="C", LANG="C", TZ="UTC", CARGO_TERM_COLOR="never",
                    RUSTUP_AUTO_INSTALL="0",
                    GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0", CARGO_HOME=str(self.cargo_home))
+        # Empty wrappers explicitly override Cargo config wrappers without
+        # editing those files. Select concrete host Rust executables below.
+        env.update(RUSTC_WRAPPER="", RUSTC_WORKSPACE_WRAPPER="")
+        cargo_output_environment(env, self.work / "cargo")
         if self.cfg.toolchain != "host":
             env["RUSTUP_TOOLCHAIN"] = self.cfg.toolchain
         if self._tools is not None:
             # Subprocesses and build scripts get the same concrete host tools.
-            env.update(RUSTC=self._tools["rustc"], RUSTDOC=self._tools["rustdoc"], CARGO=self._tools["cargo"])
+            env.update(RUSTC=self._tools["rustc"], RUSTDOC=self._tools["rustdoc"], CARGO=self._tools["cargo"],
+                       CARGO_BUILD_TARGET=self._tools["host"])
             bins = list(dict.fromkeys(str(Path(self._tools[name]).parent) for name in ("cargo", "rustc", "rustdoc")))
             env["PATH"] = os.pathsep.join([*bins, env.get("PATH", os.defpath)])
         return env
@@ -518,21 +563,12 @@ class Builder:
         missing = [name for name in required if not shutil.which(name, path=tool_env.get("PATH"))]
         if missing:
             raise BuildError("Missing tools: " + ", ".join(missing) + ". Install prerequisites explicitly; make deps changes APT packages only when requested.")
-        for key, value in os.environ.items():
-            if value and (key in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CFLAGS", "CXXFLAGS", "LDFLAGS",
-                                  "RUSTC_BOOTSTRAP", "RUSTC_LINKER", "CARGO_BUILD_BUILD_DIR",
-                                  "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER", "CARGO_BUILD_RUSTFLAGS",
-                                  "CARGO_BUILD_TARGET", "CARGO_TARGET_DIR")
-                          or key.startswith("CARGO_PROFILE_") or key.startswith("CARGO_TARGET_")
-                          or re.match(r"^(CFLAGS|CXXFLAGS|CC|CXX|AR|ARFLAGS)_", key)
-                          or key in ("TARGET_CFLAGS", "HOST_CFLAGS", "TARGET_CXXFLAGS", "HOST_CXXFLAGS",
-                                     "TARGET_AR", "HOST_AR", "AR", "ARFLAGS", "CRATE_CC_NO_DEFAULTS")):
-                raise BuildError(f"Ambient {key} makes the build ambiguous. Unset it; use documented kit options/EXTRA_*FLAGS.")
+        self.report_environment_overrides()
         env = self.environment()
         paths = host_rust.discover(self.cfg.toolchain,
                                    {"rustc": self.cfg.host_rustc, "cargo": self.cfg.host_cargo,
                                     "rustdoc": self.cfg.host_rustdoc},
-                                   os.environ, self.root, run)
+                                   env, self.root, run)
         vv = run([paths["rustc"], "-vV"], env=env, timeout=30, quiet=True)
         cargo_v = run([paths["cargo"], "--version"], env=env, timeout=30, quiet=True).strip()
         match = re.search(r"^host: (.+)$", vv, re.M)
@@ -551,6 +587,22 @@ class Builder:
         paths.update(host=host, rustc_vv=vv, cargo_version=cargo_v)
         self._tools = paths
         return paths
+
+    def environment_overrides(self) -> list[str]:
+        # Names only: avoid recording private paths/values/tokens in logs.
+        return sorted(key for key, value in os.environ.items()
+                      if value and controlled_build_variable(key))
+
+    def report_environment_overrides(self) -> None:
+        if self._environment_notice_shown:
+            return
+        names = self.environment_overrides()
+        if names:
+            print("NOTE: Using project-local build settings instead of inherited "
+                  + ", ".join(names)
+                  + ". Host environment/config files are unchanged; outputs stay in .work/. "
+                  "Use EXTRA_*FLAGS/TUNE/LTO/JOBS for explicit kit overrides.", file=sys.stderr)
+        self._environment_notice_shown = True
 
     def cargo_configuration_fingerprints(self, source: Path) -> dict[str, str]:
         """Record direct Cargo config inputs, without copying content or credentials.
@@ -642,7 +694,7 @@ class Builder:
             output.mkdir()
             env = self.environment()
             env.update(RUSTC=tools["rustc"], RUSTDOC=tools["rustdoc"], CARGO_NET_OFFLINE="false")
-            env["CARGO_TARGET_DIR"] = str(Path(temp) / "target")
+            cargo_output_environment(env, Path(temp) / "target")
             run([tools["cargo"], "update", "--manifest-path", candidate / "Cargo.toml"],
                 cwd=candidate, env=env, log=output / "update.log")
             expected = read_json(self.root / "source-manifest.json")
@@ -800,8 +852,11 @@ class Builder:
                     "binutils": run(["ld", "--version"], quiet=True).splitlines()[0]}
         build_id = hashlib.sha256(canonical(settings)).hexdigest()[:16]
         target = self.work / "target" / build_id
-        env["CARGO_TARGET_DIR"] = str(target)
-        settings.update(build_id=build_id, jobs=self.cfg.jobs)
+        cargo_output_environment(env, target)
+        settings.update(build_id=build_id, jobs=self.cfg.jobs,
+                        environment_policy="project-local-build-overrides; host-config-files-read-only",
+                        overridden_ambient_variables=self.environment_overrides(),
+                        cargo_target_dir=str(target), cargo_build_dir=str(target))
         return env, settings
 
     def cargo(self, command: str, extra: Sequence[str], env: Mapping[str, str], *, log: Path | None = None) -> str:
@@ -809,6 +864,9 @@ class Builder:
         argv = [tools["cargo"], *self.vendor_config(), command,
                 "--manifest-path", str(self.effective_source() / "Cargo.toml"),
                 "--frozen" if self.cfg.offline else "--locked", *extra]
+        if command in ("build", "check", "test"):
+            # Command-line precedence also makes artifact collection explicit.
+            argv += ["--target-dir", env["CARGO_TARGET_DIR"]]
         output = run(argv, cwd=self.effective_source(), env=env, log=log)
         self.effective_source()  # Reject source/lock modifications by Cargo/build scripts.
         return output
@@ -830,7 +888,9 @@ class Builder:
                 run([p / name], env=env, timeout=10)
         print(json.dumps({"host": tools["host"], "toolchain": tools["cargo_version"],
                           "tuning": self.cfg.tune, "jobs": self.cfg.jobs,
-                          "rustflags": rust, "cflags": c}, indent=2))
+                          "rustflags": rust, "cflags": c,
+                          "overridden_ambient_variables": self.environment_overrides(),
+                          "output_root": str(self.work)}, indent=2))
 
     def build(self, command: str = "build") -> tuple[dict[str, Any], Path]:
         env, settings = self.cargo_context()

@@ -1,5 +1,26 @@
 # Source basis and reference review
 
+## 2.2.1 ambient-environment correction - 2026-09-16
+
+Inputs: the complete supplied 2.2.0 source tarball, the original resctl-bench.zip,
+and the user's `CARGO_TARGET_DIR` error. Upstream implementation and dependency
+lock are unchanged. The driver no longer rejects inherited build overrides;
+it applies project-local settings in child processes only.
+
+Official Cargo/Rustup semantics checked for this correction:
+
+- Cargo configuration precedence, target-dir aliases, separate build-dir,
+  compiler wrappers and encoded flag priority:
+  https://doc.rust-lang.org/cargo/reference/config.html
+- Cargo environment variables:
+  https://doc.rust-lang.org/cargo/reference/environment-variables.html
+- Rustup automatic-install control:
+  https://rust-lang.github.io/rustup/environment-variables.html
+
+See VALIDATION.md and cargo-target-regression.json for executed checks and
+explicit limitations. The documentation review is not a real upstream build.
+
+
 ## 2.2.0 host-Rust correction - 2026-09-16
 
 The primary task inputs are the supplied resctl-bench.zip build kit plus upstream

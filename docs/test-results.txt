@@ -1,4 +1,4 @@
-Syntax/whitespace checks passed: 9 Python files
+Syntax/whitespace checks passed: 10 Python files
 test_deterministic_envelope_and_owner (test_buildkit.ArchiveTests.test_deterministic_envelope_and_owner) ... ok
 test_escape_symlink_rejected (test_buildkit.ArchiveTests.test_escape_symlink_rejected) ... ok
 test_unsafe_relative_paths (test_buildkit.ArchiveTests.test_unsafe_relative_paths) ... ok
@@ -10,54 +10,65 @@ test_native_arm_flags (test_buildkit.ConfigTests.test_native_arm_flags) ... ok
 test_native_x86_flags (test_buildkit.ConfigTests.test_native_x86_flags) ... ok
 test_portable_has_no_native_options (test_buildkit.ConfigTests.test_portable_has_no_native_options) ... ok
 test_root_guard (test_buildkit.ConfigTests.test_root_guard) ... ok
-test_ambient_flags_rejected (test_buildkit.PipelineTests.test_ambient_flags_rejected) ... ok
-test_bench_only_build_excludes_demo (test_buildkit.PipelineTests.test_bench_only_build_excludes_demo) ... Fetching /tmp/tmpn3bn2qz1/remote at main
-Locked upstream commit: 0d917c5064025b8f5eb45a8fa5b7957a7622ccfb
-+ /tmp/tmpn3bn2qz1/fakebin/cargo build --manifest-path /tmp/tmpn3bn2qz1/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd --bins
+test_ambient_flags_are_scoped_away_without_rejection_or_parent_mutation (test_buildkit.PipelineTests.test_ambient_flags_are_scoped_away_without_rejection_or_parent_mutation) ... NOTE: Using project-local build settings instead of inherited RUSTFLAGS. Host environment/config files are unchanged; outputs stay in .work/. Use EXTRA_*FLAGS/TUNE/LTO/JOBS for explicit kit overrides.
+Fetching /tmp/tmpo4xm_prd/remote at main
+Locked upstream commit: 798b2cdcf53a6576c407f693ee36318a48b5b29b
+ok
+test_bench_only_build_excludes_demo (test_buildkit.PipelineTests.test_bench_only_build_excludes_demo) ... Fetching /tmp/tmp84g1fiy0/remote at main
+Locked upstream commit: 798b2cdcf53a6576c407f693ee36318a48b5b29b
++ /tmp/tmp84g1fiy0/fakebin/cargo build --manifest-path /tmp/tmp84g1fiy0/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd --bins --target-dir /tmp/tmp84g1fiy0/kit/.work/target/390b6e08c1d37618
 Synthetic build completed; not upstream Rust
-+ /tmp/tmpn3bn2qz1/fakebin/cargo metadata --manifest-path /tmp/tmpn3bn2qz1/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
-+ /tmp/tmpn3bn2qz1/fakebin/cargo tree --manifest-path /tmp/tmpn3bn2qz1/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd
++ /tmp/tmp84g1fiy0/fakebin/cargo metadata --manifest-path /tmp/tmp84g1fiy0/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
++ /tmp/tmp84g1fiy0/fakebin/cargo tree --manifest-path /tmp/tmp84g1fiy0/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd
 ok
-test_complete_snapshot_contains_all_source_and_needs_no_rust (test_buildkit.PipelineTests.test_complete_snapshot_contains_all_source_and_needs_no_rust) ... Fetching /tmp/tmpyqmzdrh2/remote at main
-Locked upstream commit: 0d917c5064025b8f5eb45a8fa5b7957a7622ccfb
+test_clean_removes_only_local_work_not_inherited_shared_cache (test_buildkit.PipelineTests.test_clean_removes_only_local_work_not_inherited_shared_cache) ... ok
+test_complete_snapshot_contains_all_source_and_needs_no_rust (test_buildkit.PipelineTests.test_complete_snapshot_contains_all_source_and_needs_no_rust) ... Fetching /tmp/tmpk94uvpgb/remote at main
+Locked upstream commit: 7ad75f884cc840cf6e0eb255811a2f2373cff06e
 ok
-test_dependency_lock_tampering_is_rejected (test_buildkit.PipelineTests.test_dependency_lock_tampering_is_rejected) ... Fetching /tmp/tmp0d83_q8o/remote at main
-Locked upstream commit: 0d917c5064025b8f5eb45a8fa5b7957a7622ccfb
-+ /tmp/tmp0d83_q8o/fakebin/cargo update --manifest-path /tmp/tmp0d83_q8o/kit/.work/resolve-3e77s96e/upstream/Cargo.toml
+test_dependency_lock_tampering_is_rejected (test_buildkit.PipelineTests.test_dependency_lock_tampering_is_rejected) ... Fetching /tmp/tmpjru4z3ev/remote at main
+Locked upstream commit: 7ad75f884cc840cf6e0eb255811a2f2373cff06e
++ /tmp/tmpjru4z3ev/fakebin/cargo update --manifest-path /tmp/tmpjru4z3ev/kit/.work/resolve-gu56y9b3/upstream/Cargo.toml
 ok
-test_dependency_refresh_preserves_upstream_and_records_diff (test_buildkit.PipelineTests.test_dependency_refresh_preserves_upstream_and_records_diff) ... Fetching /tmp/tmp5_10d8cw/remote at main
-Locked upstream commit: c921c7d46bbcb3c71e71305aebede6960c174b0a
-+ /tmp/tmp5_10d8cw/fakebin/cargo update --manifest-path /tmp/tmp5_10d8cw/kit/.work/resolve-7rwcb55r/upstream/Cargo.toml
-+ /tmp/tmp5_10d8cw/fakebin/cargo build --manifest-path /tmp/tmp5_10d8cw/kit/.work/sources/c921c7d46bbc-0bdfd530147c67a8/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins
+test_dependency_refresh_preserves_upstream_and_records_diff (test_buildkit.PipelineTests.test_dependency_refresh_preserves_upstream_and_records_diff) ... Fetching /tmp/tmpjg7z0wr5/remote at main
+Locked upstream commit: 7ad75f884cc840cf6e0eb255811a2f2373cff06e
++ /tmp/tmpjg7z0wr5/fakebin/cargo update --manifest-path /tmp/tmpjg7z0wr5/kit/.work/resolve-2n__xup0/upstream/Cargo.toml
++ /tmp/tmpjg7z0wr5/fakebin/cargo build --manifest-path /tmp/tmpjg7z0wr5/kit/.work/sources/7ad75f884cc8-0bdfd530147c67a8/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmpjg7z0wr5/kit/.work/target/4659ce9c291e6d1f
 Synthetic build completed; not upstream Rust
-+ /tmp/tmp5_10d8cw/fakebin/cargo metadata --manifest-path /tmp/tmp5_10d8cw/kit/.work/sources/c921c7d46bbc-0bdfd530147c67a8/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
-+ /tmp/tmp5_10d8cw/fakebin/cargo tree --manifest-path /tmp/tmp5_10d8cw/kit/.work/sources/c921c7d46bbc-0bdfd530147c67a8/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
++ /tmp/tmpjg7z0wr5/fakebin/cargo metadata --manifest-path /tmp/tmpjg7z0wr5/kit/.work/sources/7ad75f884cc8-0bdfd530147c67a8/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
++ /tmp/tmpjg7z0wr5/fakebin/cargo tree --manifest-path /tmp/tmpjg7z0wr5/kit/.work/sources/7ad75f884cc8-0bdfd530147c67a8/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
 ok
-test_dependency_update_rejects_changes_to_source_code (test_buildkit.PipelineTests.test_dependency_update_rejects_changes_to_source_code) ... Fetching /tmp/tmp4xdhrp8z/remote at main
-Locked upstream commit: c921c7d46bbcb3c71e71305aebede6960c174b0a
-+ /tmp/tmp4xdhrp8z/fakebin/cargo update --manifest-path /tmp/tmp4xdhrp8z/kit/.work/resolve-9qt1o701/upstream/Cargo.toml
+test_dependency_update_and_vendor_do_not_write_in_shared_target (test_buildkit.PipelineTests.test_dependency_update_and_vendor_do_not_write_in_shared_target) ... NOTE: Using project-local build settings instead of inherited CARGO_BUILD_BUILD_DIR, CARGO_BUILD_TARGET_DIR, CARGO_TARGET_DIR, RUSTFLAGS. Host environment/config files are unchanged; outputs stay in .work/. Use EXTRA_*FLAGS/TUNE/LTO/JOBS for explicit kit overrides.
+Fetching /tmp/tmp6ulb72hd/remote at main
+Locked upstream commit: 7ad75f884cc840cf6e0eb255811a2f2373cff06e
++ /tmp/tmp6ulb72hd/fakebin/cargo update --manifest-path /tmp/tmp6ulb72hd/kit/.work/resolve-95tac6k6/upstream/Cargo.toml
++ /tmp/tmp6ulb72hd/fakebin/cargo vendor --manifest-path /tmp/tmp6ulb72hd/kit/.work/sources/7ad75f884cc8-0bdfd530147c67a8/Cargo.toml --locked --respect-source-config --versioned-dirs /tmp/tmp6ulb72hd/kit/.work/vendor-i6urk8ww/vendor/crates
 ok
-test_effective_source_tampering_is_rejected (test_buildkit.PipelineTests.test_effective_source_tampering_is_rejected) ... Fetching /tmp/tmpaqp6loqn/remote at main
-Locked upstream commit: c921c7d46bbcb3c71e71305aebede6960c174b0a
-+ /tmp/tmpaqp6loqn/fakebin/cargo update --manifest-path /tmp/tmpaqp6loqn/kit/.work/resolve-2nde2367/upstream/Cargo.toml
+test_dependency_update_rejects_changes_to_source_code (test_buildkit.PipelineTests.test_dependency_update_rejects_changes_to_source_code) ... Fetching /tmp/tmp1vo2l7fc/remote at main
+Locked upstream commit: 1dc36be3753310f3120b1cccf83b81679f655643
++ /tmp/tmp1vo2l7fc/fakebin/cargo update --manifest-path /tmp/tmp1vo2l7fc/kit/.work/resolve-eotmvrck/upstream/Cargo.toml
+ok
+test_effective_source_tampering_is_rejected (test_buildkit.PipelineTests.test_effective_source_tampering_is_rejected) ... Fetching /tmp/tmpp0q23xjf/remote at main
+Locked upstream commit: 1dc36be3753310f3120b1cccf83b81679f655643
++ /tmp/tmpp0q23xjf/fakebin/cargo update --manifest-path /tmp/tmpp0q23xjf/kit/.work/resolve-tgojb2x8/upstream/Cargo.toml
 ok
 test_elf_without_full_relro_rejected (test_buildkit.PipelineTests.test_elf_without_full_relro_rejected) ... ok
-test_existing_global_and_ancestor_configs_are_preserved (test_buildkit.PipelineTests.test_existing_global_and_ancestor_configs_are_preserved) ... + /tmp/tmpbf67sttb/fakebin/rustc /tmp/resctl-probe-6auyz9_l/probe.rs --target x86_64-unknown-linux-gnu -Cforce-frame-pointers=yes -Crelro-level=full -Clink-arg=-Wl,--build-id=sha1 --remap-path-prefix=/tmp/tmpbf67sttb/kit=/usr/src/resctl-bench-buildkit --remap-path-prefix=/tmp/tmpbf67sttb/cargo-home=/usr/src/cargo -Ctarget-cpu=native -Clinker=/usr/bin/gcc -o /tmp/resctl-probe-6auyz9_l/rust-probe
-+ /usr/bin/gcc -O3 -g1 -fno-omit-frame-pointer -fstack-protector-strong -D_FORTIFY_SOURCE=3 -ffile-prefix-map=/tmp/tmpbf67sttb/kit=/usr/src/resctl-bench-buildkit -ffile-prefix-map=/tmp/tmpbf67sttb/cargo-home=/usr/src/cargo -march=native -mtune=native /tmp/resctl-probe-6auyz9_l/probe.c -o /tmp/resctl-probe-6auyz9_l/c-probe
-+ /usr/bin/g++ -O3 -g1 -fno-omit-frame-pointer -fstack-protector-strong -D_FORTIFY_SOURCE=3 -ffile-prefix-map=/tmp/tmpbf67sttb/kit=/usr/src/resctl-bench-buildkit -ffile-prefix-map=/tmp/tmpbf67sttb/cargo-home=/usr/src/cargo -march=native -mtune=native -x c++ /tmp/resctl-probe-6auyz9_l/probe.c -o /tmp/resctl-probe-6auyz9_l/cxx-probe
-+ /tmp/resctl-probe-6auyz9_l/rust-probe
-+ /tmp/resctl-probe-6auyz9_l/c-probe
-+ /tmp/resctl-probe-6auyz9_l/cxx-probe
-Fetching /tmp/tmpbf67sttb/remote at main
-Locked upstream commit: 123a8a576bb1e6bc8e90e923e7a7c1426588e689
-+ /tmp/tmpbf67sttb/fakebin/cargo update --manifest-path /tmp/tmpbf67sttb/kit/.work/resolve-872elgn6/upstream/Cargo.toml
-+ /tmp/tmpbf67sttb/fakebin/cargo check --manifest-path /tmp/tmpbf67sttb/kit/.work/sources/123a8a576bb1-0bdfd530147c67a8/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins
-+ /tmp/tmpbf67sttb/fakebin/cargo test --manifest-path /tmp/tmpbf67sttb/kit/.work/sources/123a8a576bb1-0bdfd530147c67a8/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --no-run
-+ /tmp/tmpbf67sttb/fakebin/cargo build --manifest-path /tmp/tmpbf67sttb/kit/.work/sources/123a8a576bb1-0bdfd530147c67a8/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins
+test_existing_global_and_ancestor_configs_are_preserved (test_buildkit.PipelineTests.test_existing_global_and_ancestor_configs_are_preserved) ... + /tmp/tmpszz7_2h0/fakebin/rustc /tmp/resctl-probe-bxml2xdj/probe.rs --target x86_64-unknown-linux-gnu -Cforce-frame-pointers=yes -Crelro-level=full -Clink-arg=-Wl,--build-id=sha1 --remap-path-prefix=/tmp/tmpszz7_2h0/kit=/usr/src/resctl-bench-buildkit --remap-path-prefix=/tmp/tmpszz7_2h0/cargo-home=/usr/src/cargo -Ctarget-cpu=native -Clinker=/usr/bin/gcc -o /tmp/resctl-probe-bxml2xdj/rust-probe
++ /usr/bin/gcc -O3 -g1 -fno-omit-frame-pointer -fstack-protector-strong -D_FORTIFY_SOURCE=3 -ffile-prefix-map=/tmp/tmpszz7_2h0/kit=/usr/src/resctl-bench-buildkit -ffile-prefix-map=/tmp/tmpszz7_2h0/cargo-home=/usr/src/cargo -march=native -mtune=native /tmp/resctl-probe-bxml2xdj/probe.c -o /tmp/resctl-probe-bxml2xdj/c-probe
++ /usr/bin/g++ -O3 -g1 -fno-omit-frame-pointer -fstack-protector-strong -D_FORTIFY_SOURCE=3 -ffile-prefix-map=/tmp/tmpszz7_2h0/kit=/usr/src/resctl-bench-buildkit -ffile-prefix-map=/tmp/tmpszz7_2h0/cargo-home=/usr/src/cargo -march=native -mtune=native -x c++ /tmp/resctl-probe-bxml2xdj/probe.c -o /tmp/resctl-probe-bxml2xdj/cxx-probe
++ /tmp/resctl-probe-bxml2xdj/rust-probe
++ /tmp/resctl-probe-bxml2xdj/c-probe
++ /tmp/resctl-probe-bxml2xdj/cxx-probe
+Fetching /tmp/tmpszz7_2h0/remote at main
+Locked upstream commit: 1dc36be3753310f3120b1cccf83b81679f655643
++ /tmp/tmpszz7_2h0/fakebin/cargo update --manifest-path /tmp/tmpszz7_2h0/kit/.work/resolve-irkdlxv6/upstream/Cargo.toml
++ /tmp/tmpszz7_2h0/fakebin/cargo check --manifest-path /tmp/tmpszz7_2h0/kit/.work/sources/1dc36be37533-0bdfd530147c67a8/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmpszz7_2h0/kit/.work/target/c3551c30695be992
++ /tmp/tmpszz7_2h0/fakebin/cargo test --manifest-path /tmp/tmpszz7_2h0/kit/.work/sources/1dc36be37533-0bdfd530147c67a8/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --no-run --target-dir /tmp/tmpszz7_2h0/kit/.work/target/c3551c30695be992
++ /tmp/tmpszz7_2h0/fakebin/cargo build --manifest-path /tmp/tmpszz7_2h0/kit/.work/sources/1dc36be37533-0bdfd530147c67a8/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmpszz7_2h0/kit/.work/target/c3551c30695be992
 Synthetic build completed; not upstream Rust
-+ /tmp/tmpbf67sttb/fakebin/cargo metadata --manifest-path /tmp/tmpbf67sttb/kit/.work/sources/123a8a576bb1-0bdfd530147c67a8/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
-+ /tmp/tmpbf67sttb/fakebin/cargo tree --manifest-path /tmp/tmpbf67sttb/kit/.work/sources/123a8a576bb1-0bdfd530147c67a8/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
-/tmp/tmpyqmzdrh2/kit/dist/resctl-bench-buildkit-2.2.0-host-rust.tar.gz
++ /tmp/tmpszz7_2h0/fakebin/cargo metadata --manifest-path /tmp/tmpszz7_2h0/kit/.work/sources/1dc36be37533-0bdfd530147c67a8/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
++ /tmp/tmpszz7_2h0/fakebin/cargo tree --manifest-path /tmp/tmpszz7_2h0/kit/.work/sources/1dc36be37533-0bdfd530147c67a8/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
+/tmp/tmpk94uvpgb/kit/dist/resctl-bench-buildkit-2.2.1-host-rust.tar.gz
+Newest compatible dependency resolution recorded; upstream Cargo.toml and Cargo.lock remain unchanged
 Newest compatible dependency resolution recorded; upstream Cargo.toml and Cargo.lock remain unchanged
 Newest compatible dependency resolution recorded; upstream Cargo.toml and Cargo.lock remain unchanged
 Newest compatible dependency resolution recorded; upstream Cargo.toml and Cargo.lock remain unchanged
@@ -70,8 +81,8 @@ Newest compatible dependency resolution recorded; upstream Cargo.toml and Cargo.
     "-Cforce-frame-pointers=yes",
     "-Crelro-level=full",
     "-Clink-arg=-Wl,--build-id=sha1",
-    "--remap-path-prefix=/tmp/tmpbf67sttb/kit=/usr/src/resctl-bench-buildkit",
-    "--remap-path-prefix=/tmp/tmpbf67sttb/cargo-home=/usr/src/cargo",
+    "--remap-path-prefix=/tmp/tmpszz7_2h0/kit=/usr/src/resctl-bench-buildkit",
+    "--remap-path-prefix=/tmp/tmpszz7_2h0/cargo-home=/usr/src/cargo",
     "-Ctarget-cpu=native"
   ],
   "cflags": [
@@ -80,157 +91,208 @@ Newest compatible dependency resolution recorded; upstream Cargo.toml and Cargo.
     "-fno-omit-frame-pointer",
     "-fstack-protector-strong",
     "-D_FORTIFY_SOURCE=3",
-    "-ffile-prefix-map=/tmp/tmpbf67sttb/kit=/usr/src/resctl-bench-buildkit",
-    "-ffile-prefix-map=/tmp/tmpbf67sttb/cargo-home=/usr/src/cargo",
+    "-ffile-prefix-map=/tmp/tmpszz7_2h0/kit=/usr/src/resctl-bench-buildkit",
+    "-ffile-prefix-map=/tmp/tmpszz7_2h0/cargo-home=/usr/src/cargo",
     "-march=native",
     "-mtune=native"
-  ]
+  ],
+  "overridden_ambient_variables": [],
+  "output_root": "/tmp/tmpszz7_2h0/kit/.work"
 }
 Newest compatible dependency resolution recorded; upstream Cargo.toml and Cargo.lock remain unchanged
 
-Created /tmp/tmpbf67sttb/kit/dist/resctl-bench-0.1.0-x86_64-unknown-linux-gnu-native-0293e14932d5b869.tar.gz
-SHA256 37bc39f79ff39e86c87ddf1e93b91409c4af7c6200787e2c7f5f8d4b3777b970
-Binary tarball: /tmp/tmpbf67sttb/kit/dist/resctl-bench-latest.tar.gz
-+ /tmp/tmpbf67sttb/fakebin/cargo vendor --manifest-path /tmp/tmpbf67sttb/kit/.work/sources/123a8a576bb1-0bdfd530147c67a8/Cargo.toml --locked --respect-source-config --versioned-dirs /tmp/tmpbf67sttb/kit/.work/vendor-g9xkml7m/vendor/crates
+Created /tmp/tmpszz7_2h0/kit/dist/resctl-bench-0.1.0-x86_64-unknown-linux-gnu-native-c3551c30695be992.tar.gz
+SHA256 1ff678e58295b36af75bddc63859ecce60681fbf427168014451f8551d3b4c88
+Binary tarball: /tmp/tmpszz7_2h0/kit/dist/resctl-bench-latest.tar.gz
++ /tmp/tmpszz7_2h0/fakebin/cargo vendor --manifest-path /tmp/tmpszz7_2h0/kit/.work/sources/1dc36be37533-0bdfd530147c67a8/Cargo.toml --locked --respect-source-config --versioned-dirs /tmp/tmpszz7_2h0/kit/.work/vendor-lqr82dgu/vendor/crates
+ok
+test_explicit_kit_flags_work_with_inherited_flags (test_buildkit.PipelineTests.test_explicit_kit_flags_work_with_inherited_flags) ... NOTE: Using project-local build settings instead of inherited CFLAGS, CXXFLAGS, RUSTFLAGS. Host environment/config files are unchanged; outputs stay in .work/. Use EXTRA_*FLAGS/TUNE/LTO/JOBS for explicit kit overrides.
+Fetching /tmp/tmp25erbvos/remote at main
+Locked upstream commit: ad312d274ad7144ce4ea1ceec61277a954783ecb
 ok
 test_extracted_archive_make_package_entrypoint_offline (test_buildkit.PipelineTests.test_extracted_archive_make_package_entrypoint_offline)
-Real Makefile + Python subprocess + real ELF/archive; Cargo is a fixture. ... Fetching /tmp/tmpb_ja9qm5/remote at main
-Locked upstream commit: a170b935dfcf2f568dbbc0df7ccbf54718c6e21e
-+ /tmp/tmpb_ja9qm5/fakebin/cargo vendor --manifest-path /tmp/tmpb_ja9qm5/kit/upstream/Cargo.toml --locked --respect-source-config --versioned-dirs /tmp/tmpb_ja9qm5/kit/.work/vendor-x5qvw1c6/vendor/crates
+Real Makefile + Python subprocess + real ELF/archive; Cargo is a fixture. ... Fetching /tmp/tmp9t02j2ut/remote at main
+Locked upstream commit: ad312d274ad7144ce4ea1ceec61277a954783ecb
++ /tmp/tmp9t02j2ut/fakebin/cargo vendor --manifest-path /tmp/tmp9t02j2ut/kit/upstream/Cargo.toml --locked --respect-source-config --versioned-dirs /tmp/tmp9t02j2ut/kit/.work/vendor-xfpb0mp0/vendor/crates
 ok
-test_failed_build_invalidates_success_record (test_buildkit.PipelineTests.test_failed_build_invalidates_success_record) ... Fetching /tmp/tmp0menqi4_/remote at main
-Locked upstream commit: dc65e1a87e76dc765a6b53ee1b6cc5f71d020aa2
-+ /tmp/tmp0menqi4_/fakebin/cargo build --manifest-path /tmp/tmp0menqi4_/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins
+test_failed_build_invalidates_success_record (test_buildkit.PipelineTests.test_failed_build_invalidates_success_record) ... Fetching /tmp/tmpajzqd30s/remote at main
+Locked upstream commit: d6ea580396527c5e158d56c72a8b0bda440b0cf1
++ /tmp/tmpajzqd30s/fakebin/cargo build --manifest-path /tmp/tmpajzqd30s/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmpajzqd30s/kit/.work/target/6c09a70ebbcddd94
 Synthetic build completed; not upstream Rust
-+ /tmp/tmp0menqi4_/fakebin/cargo metadata --manifest-path /tmp/tmp0menqi4_/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
-+ /tmp/tmp0menqi4_/fakebin/cargo tree --manifest-path /tmp/tmp0menqi4_/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
-+ /tmp/tmp0menqi4_/fakebin/cargo build --manifest-path /tmp/tmp0menqi4_/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins
++ /tmp/tmpajzqd30s/fakebin/cargo metadata --manifest-path /tmp/tmpajzqd30s/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
++ /tmp/tmpajzqd30s/fakebin/cargo tree --manifest-path /tmp/tmpajzqd30s/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
++ /tmp/tmpajzqd30s/fakebin/cargo build --manifest-path /tmp/tmpajzqd30s/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmpajzqd30s/kit/.work/target/6c09a70ebbcddd94
 simulated Cargo compilation failure
 ok
-test_failed_dependency_update_retains_last_lock (test_buildkit.PipelineTests.test_failed_dependency_update_retains_last_lock) ... Fetching /tmp/tmprih1b810/remote at main
-Locked upstream commit: dc65e1a87e76dc765a6b53ee1b6cc5f71d020aa2
-+ /tmp/tmprih1b810/fakebin/cargo update --manifest-path /tmp/tmprih1b810/kit/.work/resolve-j27ew2a9/upstream/Cargo.toml
-+ /tmp/tmprih1b810/fakebin/cargo update --manifest-path /tmp/tmprih1b810/kit/.work/resolve-6p8hsdyy/upstream/Cargo.toml
+test_failed_dependency_update_retains_last_lock (test_buildkit.PipelineTests.test_failed_dependency_update_retains_last_lock) ... Fetching /tmp/tmp9lfnb3b5/remote at main
+Locked upstream commit: 61bee4691ab7862297f72b995d7f8971b58b694e
++ /tmp/tmp9lfnb3b5/fakebin/cargo update --manifest-path /tmp/tmp9lfnb3b5/kit/.work/resolve-jb3j3493/upstream/Cargo.toml
++ /tmp/tmp9lfnb3b5/fakebin/cargo update --manifest-path /tmp/tmp9lfnb3b5/kit/.work/resolve-bjwwf08k/upstream/Cargo.toml
 simulated update failure
 ok
-test_failed_package_removes_old_success_pointer (test_buildkit.PipelineTests.test_failed_package_removes_old_success_pointer) ... Fetching /tmp/tmp5fc2h9s1/remote at main
-Locked upstream commit: ec53aff9390111bd9214737cc3a8896f3e8ec8c4
-+ /tmp/tmp5fc2h9s1/fakebin/cargo build --manifest-path /tmp/tmp5fc2h9s1/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins
+test_failed_package_removes_old_success_pointer (test_buildkit.PipelineTests.test_failed_package_removes_old_success_pointer) ... Fetching /tmp/tmpicc_hv37/remote at main
+Locked upstream commit: 61bee4691ab7862297f72b995d7f8971b58b694e
++ /tmp/tmpicc_hv37/fakebin/cargo build --manifest-path /tmp/tmpicc_hv37/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmpicc_hv37/kit/.work/target/95c68964dfe7cc7b
 Synthetic build completed; not upstream Rust
-+ /tmp/tmp5fc2h9s1/fakebin/cargo metadata --manifest-path /tmp/tmp5fc2h9s1/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
-+ /tmp/tmp5fc2h9s1/fakebin/cargo tree --manifest-path /tmp/tmp5fc2h9s1/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
-/tmp/tmpbf67sttb/kit/dist/resctl-bench-buildkit-2.2.0-source-123a8a576bb1-c8453187f6935b36.tar.gz
-/tmp/tmpb_ja9qm5/kit/dist/resctl-bench-buildkit-2.2.0-source-a170b935dfcf-1a5d11f17209c16d.tar.gz
++ /tmp/tmpicc_hv37/fakebin/cargo metadata --manifest-path /tmp/tmpicc_hv37/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
++ /tmp/tmpicc_hv37/fakebin/cargo tree --manifest-path /tmp/tmpicc_hv37/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
+/tmp/tmpszz7_2h0/kit/dist/resctl-bench-buildkit-2.2.1-source-1dc36be37533-4e562d57b2a8d076.tar.gz
+/tmp/tmp9t02j2ut/kit/dist/resctl-bench-buildkit-2.2.1-source-ad312d274ad7-45f5b56906daf1fe.tar.gz
 Newest compatible dependency resolution recorded; upstream Cargo.toml and Cargo.lock remain unchanged
 
-Created /tmp/tmp5fc2h9s1/kit/dist/resctl-bench-0.1.0-x86_64-unknown-linux-gnu-native-d91aee8ccc57aaa0.tar.gz
-SHA256 a4a38a6e61d5e68c528306579c94eed53a7b5f2086278a61e880196d03241f4d
-Binary tarball: /tmp/tmp5fc2h9s1/kit/dist/resctl-bench-latest.tar.gz
-+ /tmp/tmp5fc2h9s1/fakebin/cargo build --manifest-path /tmp/tmp5fc2h9s1/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins
+Created /tmp/tmpicc_hv37/kit/dist/resctl-bench-0.1.0-x86_64-unknown-linux-gnu-native-95c68964dfe7cc7b.tar.gz
+SHA256 9c4cbf4a094f3e378cf8a4a98706f245e2fc79b269bcfe90b76c2367fef33611
+Binary tarball: /tmp/tmpicc_hv37/kit/dist/resctl-bench-latest.tar.gz
++ /tmp/tmpicc_hv37/fakebin/cargo build --manifest-path /tmp/tmpicc_hv37/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmpicc_hv37/kit/.work/target/95c68964dfe7cc7b
 simulated Cargo compilation failure
 ok
-test_full_pipeline_real_elf_debug_archive_install (test_buildkit.PipelineTests.test_full_pipeline_real_elf_debug_archive_install) ... Fetching /tmp/tmpewa4w18l/remote at main
-Locked upstream commit: ec53aff9390111bd9214737cc3a8896f3e8ec8c4
-+ /tmp/tmpewa4w18l/fakebin/cargo build --manifest-path /tmp/tmpewa4w18l/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins
+test_full_pipeline_real_elf_debug_archive_install (test_buildkit.PipelineTests.test_full_pipeline_real_elf_debug_archive_install) ... Fetching /tmp/tmprk2b7bri/remote at main
+Locked upstream commit: 61bee4691ab7862297f72b995d7f8971b58b694e
++ /tmp/tmprk2b7bri/fakebin/cargo build --manifest-path /tmp/tmprk2b7bri/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmprk2b7bri/kit/.work/target/3d83e6fad6de0f07
 Synthetic build completed; not upstream Rust
-+ /tmp/tmpewa4w18l/fakebin/cargo metadata --manifest-path /tmp/tmpewa4w18l/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
-+ /tmp/tmpewa4w18l/fakebin/cargo tree --manifest-path /tmp/tmpewa4w18l/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
++ /tmp/tmprk2b7bri/fakebin/cargo metadata --manifest-path /tmp/tmprk2b7bri/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
++ /tmp/tmprk2b7bri/fakebin/cargo tree --manifest-path /tmp/tmprk2b7bri/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
 
-Created /tmp/tmpewa4w18l/kit/dist/resctl-bench-0.1.0-x86_64-unknown-linux-gnu-native-9e1d94e0ff88aed0.tar.gz
-SHA256 c26fd68e1f385b07fa2b955b0d3e243873612d32b51b99afedbdf6659c6d687c
-Binary tarball: /tmp/tmpewa4w18l/kit/dist/resctl-bench-latest.tar.gz
+Created /tmp/tmprk2b7bri/kit/dist/resctl-bench-0.1.0-x86_64-unknown-linux-gnu-native-3d83e6fad6de0f07.tar.gz
+SHA256 5cd15bd934902923d58ba87ebb828590b072ff9b8b4e6c141b438e2bc839a2ab
+Binary tarball: /tmp/tmprk2b7bri/kit/dist/resctl-bench-latest.tar.gz
 ok
 test_host_compiler_change_records_new_identity_without_install (test_buildkit.PipelineTests.test_host_compiler_change_records_new_identity_without_install) ... ok
-test_install_refuses_conflict_and_modified_uninstall (test_buildkit.PipelineTests.test_install_refuses_conflict_and_modified_uninstall) ... Fetching /tmp/tmp31mgg2sq/remote at main
-Locked upstream commit: f6d91601c343d9766e9c3e604c4b37e8f22bfb6a
-+ /tmp/tmp31mgg2sq/fakebin/cargo build --manifest-path /tmp/tmp31mgg2sq/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins
+test_ignored_host_values_do_not_change_build_cache_identity (test_buildkit.PipelineTests.test_ignored_host_values_do_not_change_build_cache_identity) ... NOTE: Using project-local build settings instead of inherited CARGO_TARGET_DIR, RUSTFLAGS. Host environment/config files are unchanged; outputs stay in .work/. Use EXTRA_*FLAGS/TUNE/LTO/JOBS for explicit kit overrides.
+Fetching /tmp/tmprdk58rbn/remote at main
+Locked upstream commit: 73e63668c3f4c44e0b61ebafe818cc6e31c33fec
+ok
+test_install_refuses_conflict_and_modified_uninstall (test_buildkit.PipelineTests.test_install_refuses_conflict_and_modified_uninstall) ... Fetching /tmp/tmp5gf8yakz/remote at main
+Locked upstream commit: 73e63668c3f4c44e0b61ebafe818cc6e31c33fec
++ /tmp/tmp5gf8yakz/fakebin/cargo build --manifest-path /tmp/tmp5gf8yakz/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmp5gf8yakz/kit/.work/target/18c68af4b74b5d04
 Synthetic build completed; not upstream Rust
-+ /tmp/tmp31mgg2sq/fakebin/cargo metadata --manifest-path /tmp/tmp31mgg2sq/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
-+ /tmp/tmp31mgg2sq/fakebin/cargo tree --manifest-path /tmp/tmp31mgg2sq/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
++ /tmp/tmp5gf8yakz/fakebin/cargo metadata --manifest-path /tmp/tmp5gf8yakz/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
++ /tmp/tmp5gf8yakz/fakebin/cargo tree --manifest-path /tmp/tmp5gf8yakz/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
 ok
-test_installer_rejects_symlink_destination (test_buildkit.PipelineTests.test_installer_rejects_symlink_destination) ... Fetching /tmp/tmpm8df68a2/remote at main
-Locked upstream commit: f6d91601c343d9766e9c3e604c4b37e8f22bfb6a
-+ /tmp/tmpm8df68a2/fakebin/cargo build --manifest-path /tmp/tmpm8df68a2/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins
+test_installer_rejects_symlink_destination (test_buildkit.PipelineTests.test_installer_rejects_symlink_destination) ... Fetching /tmp/tmp3ael2deq/remote at main
+Locked upstream commit: 73e63668c3f4c44e0b61ebafe818cc6e31c33fec
++ /tmp/tmp3ael2deq/fakebin/cargo build --manifest-path /tmp/tmp3ael2deq/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmp3ael2deq/kit/.work/target/0cb336a1c27bf04c
 Synthetic build completed; not upstream Rust
-+ /tmp/tmpm8df68a2/fakebin/cargo metadata --manifest-path /tmp/tmpm8df68a2/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
-+ /tmp/tmpm8df68a2/fakebin/cargo tree --manifest-path /tmp/tmpm8df68a2/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
++ /tmp/tmp3ael2deq/fakebin/cargo metadata --manifest-path /tmp/tmp3ael2deq/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
++ /tmp/tmp3ael2deq/fakebin/cargo tree --manifest-path /tmp/tmp3ael2deq/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
 ok
-test_missing_worktree_restores_locked_sha (test_buildkit.PipelineTests.test_missing_worktree_restores_locked_sha) ... Fetching /tmp/tmpcbz20y_b/remote at main
-Locked upstream commit: 45a09f704a940d1ea4a883886c9173b2e0491709
-Fetching /tmp/tmpcbz20y_b/remote at 45a09f704a940d1ea4a883886c9173b2e0491709
-Locked upstream commit: 45a09f704a940d1ea4a883886c9173b2e0491709
+test_make_entrypoints_accept_combined_host_overrides_without_touching_configs (test_buildkit.PipelineTests.test_make_entrypoints_accept_combined_host_overrides_without_touching_configs) ... ok
+test_make_package_accepts_absolute_ambient_target_dir_and_preserves_shared_cache (test_buildkit.PipelineTests.test_make_package_accepts_absolute_ambient_target_dir_and_preserves_shared_cache) ... ok
+test_missing_worktree_restores_locked_sha (test_buildkit.PipelineTests.test_missing_worktree_restores_locked_sha) ... Fetching /tmp/tmpuc5z51w1/remote at main
+Locked upstream commit: f4b036538ca754f5841242a39f7469fa3c0ed3d0
+Fetching /tmp/tmpuc5z51w1/remote at f4b036538ca754f5841242a39f7469fa3c0ed3d0
+Locked upstream commit: f4b036538ca754f5841242a39f7469fa3c0ed3d0
 ok
-test_native_portable_cache_separation (test_buildkit.PipelineTests.test_native_portable_cache_separation) ... Fetching /tmp/tmp58istdgq/remote at main
-Locked upstream commit: 45a09f704a940d1ea4a883886c9173b2e0491709
+test_native_portable_cache_separation (test_buildkit.PipelineTests.test_native_portable_cache_separation) ... Fetching /tmp/tmp21nu3ncc/remote at main
+Locked upstream commit: f4b036538ca754f5841242a39f7469fa3c0ed3d0
 ok
 test_offline_dependency_update_rejected (test_buildkit.PipelineTests.test_offline_dependency_update_rejected) ... ok
 test_offline_fails_without_source (test_buildkit.PipelineTests.test_offline_fails_without_source) ... ok
 test_online_make_package_never_invokes_apt_or_rustup_or_updates_crates (test_buildkit.PipelineTests.test_online_make_package_never_invokes_apt_or_rustup_or_updates_crates)
 Actual Make/main/package, with host Rust simulated and real ELF output. ... ok
-test_package_checksum_tamper_rejected (test_buildkit.PipelineTests.test_package_checksum_tamper_rejected) ... Fetching /tmp/tmpcricwyf6/remote at main
-Locked upstream commit: 091a47069827c4bb6a1ab9ad2115fbf3a730460a
-+ /tmp/tmpcricwyf6/fakebin/cargo build --manifest-path /tmp/tmpcricwyf6/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins
+test_package_checksum_tamper_rejected (test_buildkit.PipelineTests.test_package_checksum_tamper_rejected) ... Fetching /tmp/tmptlpuiwd4/remote at main
+Locked upstream commit: f4b036538ca754f5841242a39f7469fa3c0ed3d0
++ /tmp/tmptlpuiwd4/fakebin/cargo build --manifest-path /tmp/tmptlpuiwd4/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmptlpuiwd4/kit/.work/target/52152fa6c4ba5c64
 Synthetic build completed; not upstream Rust
-+ /tmp/tmpcricwyf6/fakebin/cargo metadata --manifest-path /tmp/tmpcricwyf6/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
-+ /tmp/tmpcricwyf6/fakebin/cargo tree --manifest-path /tmp/tmpcricwyf6/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
++ /tmp/tmptlpuiwd4/fakebin/cargo metadata --manifest-path /tmp/tmptlpuiwd4/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
++ /tmp/tmptlpuiwd4/fakebin/cargo tree --manifest-path /tmp/tmptlpuiwd4/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
 ok
-test_populated_archive_preserves_updated_lock_and_offline_relocation (test_buildkit.PipelineTests.test_populated_archive_preserves_updated_lock_and_offline_relocation) ... Fetching /tmp/tmpyn7_pbkt/remote at main
-Locked upstream commit: 091a47069827c4bb6a1ab9ad2115fbf3a730460a
-+ /tmp/tmpyn7_pbkt/fakebin/cargo update --manifest-path /tmp/tmpyn7_pbkt/kit/.work/resolve-32x6v3ka/upstream/Cargo.toml
-+ /tmp/tmpyn7_pbkt/fakebin/cargo vendor --manifest-path /tmp/tmpyn7_pbkt/kit/.work/sources/091a47069827-0bdfd530147c67a8/Cargo.toml --locked --respect-source-config --versioned-dirs /tmp/tmpyn7_pbkt/kit/.work/vendor-a06qvlrc/vendor/crates
-+ /tmp/tmpyn7_pbkt/fakebin/cargo --config /tmp/tmpyn7_pbkt/updated-unpack/resctl-bench-buildkit-2.2.0-source-091a47069827-146251c758e72fc4/.work/vendor-config.toml build --manifest-path /tmp/tmpyn7_pbkt/updated-unpack/resctl-bench-buildkit-2.2.0-source-091a47069827-146251c758e72fc4/.work/sources/091a47069827-0bdfd530147c67a8/Cargo.toml --frozen --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins
+test_populated_archive_preserves_updated_lock_and_offline_relocation (test_buildkit.PipelineTests.test_populated_archive_preserves_updated_lock_and_offline_relocation) ... Fetching /tmp/tmpqjgdmeye/remote at main
+Locked upstream commit: f5ddf47fb9d812f6d09df0585161a6a3cffd8d0d
++ /tmp/tmpqjgdmeye/fakebin/cargo update --manifest-path /tmp/tmpqjgdmeye/kit/.work/resolve-9hijmrgr/upstream/Cargo.toml
++ /tmp/tmpqjgdmeye/fakebin/cargo vendor --manifest-path /tmp/tmpqjgdmeye/kit/.work/sources/f5ddf47fb9d8-0bdfd530147c67a8/Cargo.toml --locked --respect-source-config --versioned-dirs /tmp/tmpqjgdmeye/kit/.work/vendor-4br40gg6/vendor/crates
++ /tmp/tmpqjgdmeye/fakebin/cargo --config /tmp/tmpqjgdmeye/updated-unpack/resctl-bench-buildkit-2.2.1-source-f5ddf47fb9d8-e6abc49ce82657ec/.work/vendor-config.toml build --manifest-path /tmp/tmpqjgdmeye/updated-unpack/resctl-bench-buildkit-2.2.1-source-f5ddf47fb9d8-e6abc49ce82657ec/.work/sources/f5ddf47fb9d8-0bdfd530147c67a8/Cargo.toml --frozen --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmpqjgdmeye/updated-unpack/resctl-bench-buildkit-2.2.1-source-f5ddf47fb9d8-e6abc49ce82657ec/.work/target/299fb2b84b15caa7
 Synthetic build completed; not upstream Rust
-+ /tmp/tmpyn7_pbkt/fakebin/cargo --config /tmp/tmpyn7_pbkt/updated-unpack/resctl-bench-buildkit-2.2.0-source-091a47069827-146251c758e72fc4/.work/vendor-config.toml metadata --manifest-path /tmp/tmpyn7_pbkt/updated-unpack/resctl-bench-buildkit-2.2.0-source-091a47069827-146251c758e72fc4/.work/sources/091a47069827-0bdfd530147c67a8/Cargo.toml --frozen --format-version 1 --filter-platform x86_64-unknown-linux-gnu
-+ /tmp/tmpyn7_pbkt/fakebin/cargo --config /tmp/tmpyn7_pbkt/updated-unpack/resctl-bench-buildkit-2.2.0-source-091a47069827-146251c758e72fc4/.work/vendor-config.toml tree --manifest-path /tmp/tmpyn7_pbkt/updated-unpack/resctl-bench-buildkit-2.2.0-source-091a47069827-146251c758e72fc4/.work/sources/091a47069827-0bdfd530147c67a8/Cargo.toml --frozen --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
-Installed 36 files under /tmp/tmpewa4w18l/install-prefix; no services started
++ /tmp/tmpqjgdmeye/fakebin/cargo --config /tmp/tmpqjgdmeye/updated-unpack/resctl-bench-buildkit-2.2.1-source-f5ddf47fb9d8-e6abc49ce82657ec/.work/vendor-config.toml metadata --manifest-path /tmp/tmpqjgdmeye/updated-unpack/resctl-bench-buildkit-2.2.1-source-f5ddf47fb9d8-e6abc49ce82657ec/.work/sources/f5ddf47fb9d8-0bdfd530147c67a8/Cargo.toml --frozen --format-version 1 --filter-platform x86_64-unknown-linux-gnu
++ /tmp/tmpqjgdmeye/fakebin/cargo --config /tmp/tmpqjgdmeye/updated-unpack/resctl-bench-buildkit-2.2.1-source-f5ddf47fb9d8-e6abc49ce82657ec/.work/vendor-config.toml tree --manifest-path /tmp/tmpqjgdmeye/updated-unpack/resctl-bench-buildkit-2.2.1-source-f5ddf47fb9d8-e6abc49ce82657ec/.work/sources/f5ddf47fb9d8-0bdfd530147c67a8/Cargo.toml --frozen --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
+Installed 36 files under /tmp/tmprk2b7bri/install-prefix; no services started
 Removed 36 unchanged tracked files; benchmark data was not touched
-Installed 36 files under /tmp/tmp31mgg2sq/install; no services started
+Installed 36 files under /tmp/tmp5gf8yakz/install; no services started
 Newest compatible dependency resolution recorded; upstream Cargo.toml and Cargo.lock remain unchanged
-/tmp/tmpyn7_pbkt/kit/dist/resctl-bench-buildkit-2.2.0-source-091a47069827-146251c758e72fc4.tar.gz
+/tmp/tmpqjgdmeye/kit/dist/resctl-bench-buildkit-2.2.1-source-f5ddf47fb9d8-e6abc49ce82657ec.tar.gz
 
-Created /tmp/tmpyn7_pbkt/updated-unpack/resctl-bench-buildkit-2.2.0-source-091a47069827-146251c758e72fc4/dist/resctl-bench-0.1.0-x86_64-unknown-linux-gnu-native-ff173c4ca9bf1a77.tar.gz
-SHA256 dcb3abd801fbfcf67d8b243c7d4ff79a3ce51783ce77a7474c99bdb3b93035f7
-Binary tarball: /tmp/tmpyn7_pbkt/updated-unpack/resctl-bench-buildkit-2.2.0-source-091a47069827-146251c758e72fc4/dist/resctl-bench-latest.tar.gz
+Created /tmp/tmpqjgdmeye/updated-unpack/resctl-bench-buildkit-2.2.1-source-f5ddf47fb9d8-e6abc49ce82657ec/dist/resctl-bench-0.1.0-x86_64-unknown-linux-gnu-native-299fb2b84b15caa7.tar.gz
+SHA256 3aff19a9283525012b17fe6862aeddfd48d4d7bf800baec8bd04514bdd0600af
+Binary tarball: /tmp/tmpqjgdmeye/updated-unpack/resctl-bench-buildkit-2.2.1-source-f5ddf47fb9d8-e6abc49ce82657ec/dist/resctl-bench-latest.tar.gz
 ok
-test_probe_uses_configured_c_and_cpp_flags (test_buildkit.PipelineTests.test_probe_uses_configured_c_and_cpp_flags) ... + /tmp/tmpu29vggzv/fakebin/rustc /tmp/resctl-probe-0sxvzqv_/probe.rs --target x86_64-unknown-linux-gnu -Cforce-frame-pointers=yes -Crelro-level=full -Clink-arg=-Wl,--build-id=sha1 --remap-path-prefix=/tmp/tmpu29vggzv/kit=/usr/src/resctl-bench-buildkit --remap-path-prefix=/tmp/tmpu29vggzv/cargo-home=/usr/src/cargo -Ctarget-cpu=native -Clinker=/usr/bin/gcc -o /tmp/resctl-probe-0sxvzqv_/rust-probe
-+ /usr/bin/gcc -O3 -g1 -fno-omit-frame-pointer -fstack-protector-strong -D_FORTIFY_SOURCE=3 -ffile-prefix-map=/tmp/tmpu29vggzv/kit=/usr/src/resctl-bench-buildkit -ffile-prefix-map=/tmp/tmpu29vggzv/cargo-home=/usr/src/cargo -march=native -mtune=native /tmp/resctl-probe-0sxvzqv_/probe.c -o /tmp/resctl-probe-0sxvzqv_/c-probe
-+ /usr/bin/g++ -O3 -g1 -fno-omit-frame-pointer -fstack-protector-strong -D_FORTIFY_SOURCE=3 -ffile-prefix-map=/tmp/tmpu29vggzv/kit=/usr/src/resctl-bench-buildkit -ffile-prefix-map=/tmp/tmpu29vggzv/cargo-home=/usr/src/cargo -march=native -mtune=native -x c++ /tmp/resctl-probe-0sxvzqv_/probe.c -o /tmp/resctl-probe-0sxvzqv_/cxx-probe
-+ /tmp/resctl-probe-0sxvzqv_/rust-probe
-+ /tmp/resctl-probe-0sxvzqv_/c-probe
-+ /tmp/resctl-probe-0sxvzqv_/cxx-probe
+test_probe_uses_configured_c_and_cpp_flags (test_buildkit.PipelineTests.test_probe_uses_configured_c_and_cpp_flags) ... + /tmp/tmps6p8fks5/fakebin/rustc /tmp/resctl-probe-1fz5txst/probe.rs --target x86_64-unknown-linux-gnu -Cforce-frame-pointers=yes -Crelro-level=full -Clink-arg=-Wl,--build-id=sha1 --remap-path-prefix=/tmp/tmps6p8fks5/kit=/usr/src/resctl-bench-buildkit --remap-path-prefix=/tmp/tmps6p8fks5/cargo-home=/usr/src/cargo -Ctarget-cpu=native -Clinker=/usr/bin/gcc -o /tmp/resctl-probe-1fz5txst/rust-probe
++ /usr/bin/gcc -O3 -g1 -fno-omit-frame-pointer -fstack-protector-strong -D_FORTIFY_SOURCE=3 -ffile-prefix-map=/tmp/tmps6p8fks5/kit=/usr/src/resctl-bench-buildkit -ffile-prefix-map=/tmp/tmps6p8fks5/cargo-home=/usr/src/cargo -march=native -mtune=native /tmp/resctl-probe-1fz5txst/probe.c -o /tmp/resctl-probe-1fz5txst/c-probe
++ /usr/bin/g++ -O3 -g1 -fno-omit-frame-pointer -fstack-protector-strong -D_FORTIFY_SOURCE=3 -ffile-prefix-map=/tmp/tmps6p8fks5/kit=/usr/src/resctl-bench-buildkit -ffile-prefix-map=/tmp/tmps6p8fks5/cargo-home=/usr/src/cargo -march=native -mtune=native -x c++ /tmp/resctl-probe-1fz5txst/probe.c -o /tmp/resctl-probe-1fz5txst/cxx-probe
++ /tmp/resctl-probe-1fz5txst/rust-probe
++ /tmp/resctl-probe-1fz5txst/c-probe
++ /tmp/resctl-probe-1fz5txst/cxx-probe
 ok
-test_source_dist_relocates_with_true_git_identity_and_offline_flags (test_buildkit.PipelineTests.test_source_dist_relocates_with_true_git_identity_and_offline_flags) ... Fetching /tmp/tmpu1zgyato/remote at main
-Locked upstream commit: 40cc107d4984d1050062556790363254ee0698a8
-+ /tmp/tmpu1zgyato/fakebin/cargo vendor --manifest-path /tmp/tmpu1zgyato/kit/upstream/Cargo.toml --locked --respect-source-config --versioned-dirs /tmp/tmpu1zgyato/kit/.work/vendor-4tasjevx/vendor/crates
-+ /tmp/tmpu1zgyato/fakebin/cargo --config /tmp/tmpu1zgyato/unpacked/resctl-bench-buildkit-2.2.0-source-40cc107d4984-49dd5cc6cbaad7e1/.work/vendor-config.toml build --manifest-path /tmp/tmpu1zgyato/unpacked/resctl-bench-buildkit-2.2.0-source-40cc107d4984-49dd5cc6cbaad7e1/upstream/Cargo.toml --frozen --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins
+test_relative_ambient_target_dir_does_not_write_under_source (test_buildkit.PipelineTests.test_relative_ambient_target_dir_does_not_write_under_source) ... NOTE: Using project-local build settings instead of inherited CARGO_BUILD_BUILD_DIR, CARGO_BUILD_TARGET_DIR, CARGO_TARGET_DIR. Host environment/config files are unchanged; outputs stay in .work/. Use EXTRA_*FLAGS/TUNE/LTO/JOBS for explicit kit overrides.
+Fetching /tmp/tmpg96ahg5l/remote at main
+Locked upstream commit: af30dddf418abd0733db3c8905ed86851889f45b
++ /tmp/tmpg96ahg5l/fakebin/cargo build --manifest-path /tmp/tmpg96ahg5l/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmpg96ahg5l/kit/.work/target/24fbaf31c28263d2
 Synthetic build completed; not upstream Rust
-+ /tmp/tmpu1zgyato/fakebin/cargo --config /tmp/tmpu1zgyato/unpacked/resctl-bench-buildkit-2.2.0-source-40cc107d4984-49dd5cc6cbaad7e1/.work/vendor-config.toml metadata --manifest-path /tmp/tmpu1zgyato/unpacked/resctl-bench-buildkit-2.2.0-source-40cc107d4984-49dd5cc6cbaad7e1/upstream/Cargo.toml --frozen --format-version 1 --filter-platform x86_64-unknown-linux-gnu
-+ /tmp/tmpu1zgyato/fakebin/cargo --config /tmp/tmpu1zgyato/unpacked/resctl-bench-buildkit-2.2.0-source-40cc107d4984-49dd5cc6cbaad7e1/.work/vendor-config.toml tree --manifest-path /tmp/tmpu1zgyato/unpacked/resctl-bench-buildkit-2.2.0-source-40cc107d4984-49dd5cc6cbaad7e1/upstream/Cargo.toml --frozen --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
++ /tmp/tmpg96ahg5l/fakebin/cargo metadata --manifest-path /tmp/tmpg96ahg5l/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
++ /tmp/tmpg96ahg5l/fakebin/cargo tree --manifest-path /tmp/tmpg96ahg5l/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
+{
+  "host": "x86_64-unknown-linux-gnu",
+  "toolchain": "cargo 1.95.0 (fixture)",
+  "tuning": "native",
+  "jobs": 1,
+  "rustflags": [
+    "-Cforce-frame-pointers=yes",
+    "-Crelro-level=full",
+    "-Clink-arg=-Wl,--build-id=sha1",
+    "--remap-path-prefix=/tmp/tmps6p8fks5/kit=/usr/src/resctl-bench-buildkit",
+    "--remap-path-prefix=/tmp/tmps6p8fks5/cargo-home=/usr/src/cargo",
+    "-Ctarget-cpu=native"
+  ],
+  "cflags": [
+    "-O3",
+    "-g1",
+    "-fno-omit-frame-pointer",
+    "-fstack-protector-strong",
+    "-D_FORTIFY_SOURCE=3",
+    "-ffile-prefix-map=/tmp/tmps6p8fks5/kit=/usr/src/resctl-bench-buildkit",
+    "-ffile-prefix-map=/tmp/tmps6p8fks5/cargo-home=/usr/src/cargo",
+    "-march=native",
+    "-mtune=native"
+  ],
+  "overridden_ambient_variables": [],
+  "output_root": "/tmp/tmps6p8fks5/kit/.work"
+}
+
+Created /tmp/tmpg96ahg5l/kit/dist/resctl-bench-0.1.0-x86_64-unknown-linux-gnu-native-24fbaf31c28263d2.tar.gz
+SHA256 2d38ffd92ffafd334362d6f2744f6348888ed96bab38b9ee5510872bd3a3de5f
+Binary tarball: /tmp/tmpg96ahg5l/kit/dist/resctl-bench-latest.tar.gz
 ok
-test_source_edit_is_rejected (test_buildkit.PipelineTests.test_source_edit_is_rejected) ... Fetching /tmp/tmpixfmbxbd/remote at main
-Locked upstream commit: 40cc107d4984d1050062556790363254ee0698a8
+test_source_dist_relocates_with_true_git_identity_and_offline_flags (test_buildkit.PipelineTests.test_source_dist_relocates_with_true_git_identity_and_offline_flags) ... Fetching /tmp/tmpirjd5kwc/remote at main
+Locked upstream commit: af30dddf418abd0733db3c8905ed86851889f45b
++ /tmp/tmpirjd5kwc/fakebin/cargo vendor --manifest-path /tmp/tmpirjd5kwc/kit/upstream/Cargo.toml --locked --respect-source-config --versioned-dirs /tmp/tmpirjd5kwc/kit/.work/vendor-uv2coe2b/vendor/crates
++ /tmp/tmpirjd5kwc/fakebin/cargo --config /tmp/tmpirjd5kwc/unpacked/resctl-bench-buildkit-2.2.1-source-af30dddf418a-c4309ec5c8e03f70/.work/vendor-config.toml build --manifest-path /tmp/tmpirjd5kwc/unpacked/resctl-bench-buildkit-2.2.1-source-af30dddf418a-c4309ec5c8e03f70/upstream/Cargo.toml --frozen --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmpirjd5kwc/unpacked/resctl-bench-buildkit-2.2.1-source-af30dddf418a-c4309ec5c8e03f70/.work/target/2c2ff877a57351b4
+Synthetic build completed; not upstream Rust
++ /tmp/tmpirjd5kwc/fakebin/cargo --config /tmp/tmpirjd5kwc/unpacked/resctl-bench-buildkit-2.2.1-source-af30dddf418a-c4309ec5c8e03f70/.work/vendor-config.toml metadata --manifest-path /tmp/tmpirjd5kwc/unpacked/resctl-bench-buildkit-2.2.1-source-af30dddf418a-c4309ec5c8e03f70/upstream/Cargo.toml --frozen --format-version 1 --filter-platform x86_64-unknown-linux-gnu
++ /tmp/tmpirjd5kwc/fakebin/cargo --config /tmp/tmpirjd5kwc/unpacked/resctl-bench-buildkit-2.2.1-source-af30dddf418a-c4309ec5c8e03f70/.work/vendor-config.toml tree --manifest-path /tmp/tmpirjd5kwc/unpacked/resctl-bench-buildkit-2.2.1-source-af30dddf418a-c4309ec5c8e03f70/upstream/Cargo.toml --frozen --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
 ok
-test_source_pin_does_not_follow_branch (test_buildkit.PipelineTests.test_source_pin_does_not_follow_branch) ... Fetching /tmp/tmp9qg5cntf/remote at main
-Locked upstream commit: 40cc107d4984d1050062556790363254ee0698a8
-Fetching /tmp/tmp9qg5cntf/remote at main
-Locked upstream commit: 84757ce7a625eabc5fbd8c0148ad04d18b4285d0
+test_source_edit_is_rejected (test_buildkit.PipelineTests.test_source_edit_is_rejected) ... Fetching /tmp/tmpde5rloei/remote at main
+Locked upstream commit: 3443c7bad4292e08cecae49cb5c9a596a0eab420
 ok
-test_source_update_retires_old_lock_and_vendor (test_buildkit.PipelineTests.test_source_update_retires_old_lock_and_vendor) ... Fetching /tmp/tmpq286y4w3/remote at main
-Locked upstream commit: 3f785368155d1df5edf76cc385655ba5127c9608
-+ /tmp/tmpq286y4w3/fakebin/cargo update --manifest-path /tmp/tmpq286y4w3/kit/.work/resolve-ruha9kpv/upstream/Cargo.toml
-+ /tmp/tmpq286y4w3/fakebin/cargo vendor --manifest-path /tmp/tmpq286y4w3/kit/.work/sources/3f785368155d-0bdfd530147c67a8/Cargo.toml --locked --respect-source-config --versioned-dirs /tmp/tmpq286y4w3/kit/.work/vendor-ak243xxi/vendor/crates
-Fetching /tmp/tmpq286y4w3/remote at main
-Previous generated state retained at /tmp/tmpq286y4w3/kit/.work/retired/vendor-q1gw6b5h/vendor
-Previous generated state retained at /tmp/tmpq286y4w3/kit/.work/retired/dependency-lock-fqcfpgkx/dependency-lock
-Locked upstream commit: 3f785368155d1df5edf76cc385655ba5127c9608
+test_source_pin_does_not_follow_branch (test_buildkit.PipelineTests.test_source_pin_does_not_follow_branch) ... Fetching /tmp/tmpts742q7y/remote at main
+Locked upstream commit: 3443c7bad4292e08cecae49cb5c9a596a0eab420
+Fetching /tmp/tmpts742q7y/remote at main
+Locked upstream commit: e2ab60da7aa42edbc2492ee298191a5582027921
 ok
-test_test_compile_never_executes_tests (test_buildkit.PipelineTests.test_test_compile_never_executes_tests) ... Fetching /tmp/tmpa8u_lw5r/remote at main
-Locked upstream commit: 3f785368155d1df5edf76cc385655ba5127c9608
-+ /tmp/tmpa8u_lw5r/fakebin/cargo test --manifest-path /tmp/tmpa8u_lw5r/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --no-run
+test_source_update_retires_old_lock_and_vendor (test_buildkit.PipelineTests.test_source_update_retires_old_lock_and_vendor) ... Fetching /tmp/tmpf704nvmj/remote at main
+Locked upstream commit: 3443c7bad4292e08cecae49cb5c9a596a0eab420
++ /tmp/tmpf704nvmj/fakebin/cargo update --manifest-path /tmp/tmpf704nvmj/kit/.work/resolve-kdkdhwry/upstream/Cargo.toml
++ /tmp/tmpf704nvmj/fakebin/cargo vendor --manifest-path /tmp/tmpf704nvmj/kit/.work/sources/3443c7bad429-0bdfd530147c67a8/Cargo.toml --locked --respect-source-config --versioned-dirs /tmp/tmpf704nvmj/kit/.work/vendor-hbyrky8a/vendor/crates
+Fetching /tmp/tmpf704nvmj/remote at main
+Previous generated state retained at /tmp/tmpf704nvmj/kit/.work/retired/vendor-bldzaegt/vendor
+Previous generated state retained at /tmp/tmpf704nvmj/kit/.work/retired/dependency-lock-xl4zu08x/dependency-lock
+Locked upstream commit: 3443c7bad4292e08cecae49cb5c9a596a0eab420
 ok
-test_vendor_tampering_is_rejected (test_buildkit.PipelineTests.test_vendor_tampering_is_rejected) ... Fetching /tmp/tmpf0n2iqi9/remote at main
-Locked upstream commit: 3f785368155d1df5edf76cc385655ba5127c9608
-+ /tmp/tmpf0n2iqi9/fakebin/cargo vendor --manifest-path /tmp/tmpf0n2iqi9/kit/upstream/Cargo.toml --locked --respect-source-config --versioned-dirs /tmp/tmpf0n2iqi9/kit/.work/vendor-2wuaq_sv/vendor/crates
+test_test_compile_never_executes_tests (test_buildkit.PipelineTests.test_test_compile_never_executes_tests) ... Fetching /tmp/tmpflx9u0ep/remote at main
+Locked upstream commit: daf058ba9526f213627ffed99e829cf82411941e
++ /tmp/tmpflx9u0ep/fakebin/cargo test --manifest-path /tmp/tmpflx9u0ep/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --no-run --target-dir /tmp/tmpflx9u0ep/kit/.work/target/9947e054f7ff0114
+ok
+test_vendor_tampering_is_rejected (test_buildkit.PipelineTests.test_vendor_tampering_is_rejected) ... Fetching /tmp/tmp5hfffbzm/remote at main
+Locked upstream commit: daf058ba9526f213627ffed99e829cf82411941e
++ /tmp/tmp5hfffbzm/fakebin/cargo vendor --manifest-path /tmp/tmp5hfffbzm/kit/upstream/Cargo.toml --locked --respect-source-config --versioned-dirs /tmp/tmp5hfffbzm/kit/.work/vendor-hnm89wfg/vendor/crates
 ok
 test_wrong_architecture_elf_rejected (test_buildkit.PipelineTests.test_wrong_architecture_elf_rejected) ... ok
 test_offline_package_skips_all_updates (test_entrypoints.DispatchTests.test_offline_package_skips_all_updates) ... ok
@@ -248,6 +310,16 @@ test_missing_debian_reports_incomplete_archive (test_entrypoints.EntrypointTests
 test_missing_host_rust_reports_incomplete_archive_not_pip_dependency (test_entrypoints.EntrypointTests.test_missing_host_rust_reports_incomplete_archive_not_pip_dependency) ... ok
 test_offline_make_package_starts_without_import_error (test_entrypoints.EntrypointTests.test_offline_make_package_starts_without_import_error) ... ok
 test_sudo_authenticates_visibly_before_logged_apt_commands (test_entrypoints.PrivilegePromptTests.test_sudo_authenticates_visibly_before_logged_apt_commands) ... ok
+test_all_controlled_exact_variables_no_longer_cause_rejection (test_environment.BuildEnvironmentTests.test_all_controlled_exact_variables_no_longer_cause_rejection) ... ok
+test_both_target_aliases_and_intermediates_share_local_path (test_environment.BuildEnvironmentTests.test_both_target_aliases_and_intermediates_share_local_path) ... ok
+test_empty_overrides_do_not_generate_noise (test_environment.BuildEnvironmentTests.test_empty_overrides_do_not_generate_noise) ... ok
+test_environment_construction_does_not_write_files (test_environment.BuildEnvironmentTests.test_environment_construction_does_not_write_files) ... ok
+test_explicit_rust_selectors_are_not_cleared (test_environment.BuildEnvironmentTests.test_explicit_rust_selectors_are_not_cleared) ... ok
+test_notice_contains_names_only_once_and_does_not_leak_values (test_environment.BuildEnvironmentTests.test_notice_contains_names_only_once_and_does_not_leak_values) ... ok
+test_profile_and_target_specific_patterns_are_scoped_away (test_environment.BuildEnvironmentTests.test_profile_and_target_specific_patterns_are_scoped_away) ... ok
+test_registry_mirror_credentials_and_proxy_environment_are_preserved (test_environment.BuildEnvironmentTests.test_registry_mirror_credentials_and_proxy_environment_are_preserved) ... ok
+test_unusual_inherited_target_values_are_not_parsed_or_used (test_environment.BuildEnvironmentTests.test_unusual_inherited_target_values_are_not_parsed_or_used) ... ok
+test_wrapper_and_bootstrap_environment_cannot_override_host_selection (test_environment.BuildEnvironmentTests.test_wrapper_and_bootstrap_environment_cannot_override_host_selection) ... ok
 test_apt_parsing_uses_c_locale_in_a_localized_shell (test_forky.DebianPolicyTests.test_apt_parsing_uses_c_locale_in_a_localized_shell) ... ok
 test_build_override_never_allows_wrong_suite_apt_install (test_forky.DebianPolicyTests.test_build_override_never_allows_wrong_suite_apt_install) ... ok
 test_compiler_metapackages_resolve_current_implementation_recursively (test_forky.DebianPolicyTests.test_compiler_metapackages_resolve_current_implementation_recursively) ... ok
@@ -291,35 +363,10 @@ test_update_rustup_target_cannot_call_any_external_command (test_host_rust.HostR
 test_update_toolchain_target_cannot_call_any_external_command (test_host_rust.HostRustTests.test_update_toolchain_target_cannot_call_any_external_command) ... ok
 
 ----------------------------------------------------------------------
-Ran 99 tests in 13.977s
+Ran 116 tests in 15.795s
 
 OK
-{
-  "host": "x86_64-unknown-linux-gnu",
-  "toolchain": "cargo 1.95.0 (fixture)",
-  "tuning": "native",
-  "jobs": 1,
-  "rustflags": [
-    "-Cforce-frame-pointers=yes",
-    "-Crelro-level=full",
-    "-Clink-arg=-Wl,--build-id=sha1",
-    "--remap-path-prefix=/tmp/tmpu29vggzv/kit=/usr/src/resctl-bench-buildkit",
-    "--remap-path-prefix=/tmp/tmpu29vggzv/cargo-home=/usr/src/cargo",
-    "-Ctarget-cpu=native"
-  ],
-  "cflags": [
-    "-O3",
-    "-g1",
-    "-fno-omit-frame-pointer",
-    "-fstack-protector-strong",
-    "-D_FORTIFY_SOURCE=3",
-    "-ffile-prefix-map=/tmp/tmpu29vggzv/kit=/usr/src/resctl-bench-buildkit",
-    "-ffile-prefix-map=/tmp/tmpu29vggzv/cargo-home=/usr/src/cargo",
-    "-march=native",
-    "-mtune=native"
-  ]
-}
-/tmp/tmpu1zgyato/kit/dist/resctl-bench-buildkit-2.2.0-source-40cc107d4984-49dd5cc6cbaad7e1.tar.gz
+/tmp/tmpirjd5kwc/kit/dist/resctl-bench-buildkit-2.2.1-source-af30dddf418a-c4309ec5c8e03f70.tar.gz
 Newest compatible dependency resolution recorded; upstream Cargo.toml and Cargo.lock remain unchanged
 {
   "indexes": [],
@@ -335,7 +382,7 @@ Newest compatible dependency resolution recorded; upstream Cargo.toml and Cargo.
   "schema": 1,
   "codename": "forky",
   "group": "build",
-  "resolved_at_utc": "2026-09-16T08:09:15.122998+00:00",
+  "resolved_at_utc": "2026-09-16T08:30:48.709389+00:00",
   "freshness": "as of configured APT indexes, not all Debian or upstream releases",
   "indexes": [
     "https://deb.debian.org/debian testing/main amd64 Packages"

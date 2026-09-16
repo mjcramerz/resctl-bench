@@ -27,8 +27,8 @@ jobs:
         run: |
           make kit-dist
           mkdir /tmp/kit-release-check
-          tar -xzf dist/resctl-bench-buildkit-2.2.0.tar.gz -C /tmp/kit-release-check
-          cd /tmp/kit-release-check/resctl-bench-buildkit-2.2.0
+          tar -xzf dist/resctl-bench-buildkit-2.2.1.tar.gz -C /tmp/kit-release-check
+          cd /tmp/kit-release-check/resctl-bench-buildkit-2.2.1
           sha256sum -c SHA256SUMS
           PYTHONSAFEPATH=1 make help lint test
   real-upstream:

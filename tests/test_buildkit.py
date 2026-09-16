@@ -146,7 +146,14 @@ with open(os.environ['FIXTURE_LOG'],'a') as f:
        'lto':os.environ.get('CARGO_PROFILE_RELEASE_LTO'), 'target':os.environ.get('CARGO_TARGET_DIR'),
        'rustc':os.environ.get('RUSTC'), 'cargo':os.environ.get('CARGO'),
        'rustup_auto_install':os.environ.get('RUSTUP_AUTO_INSTALL'),
-       'cargo_home':os.environ.get('CARGO_HOME')})+'\n')
+       'cargo_home':os.environ.get('CARGO_HOME'),
+       'build_target_dir':os.environ.get('CARGO_BUILD_TARGET_DIR'),
+       'build_build_dir':os.environ.get('CARGO_BUILD_BUILD_DIR'),
+       'wrapper':os.environ.get('RUSTC_WRAPPER'),
+       'workspace_wrapper':os.environ.get('RUSTC_WORKSPACE_WRAPPER'),
+       'ambient_rustflags':os.environ.get('RUSTFLAGS'),
+       'bootstrap':os.environ.get('RUSTC_BOOTSTRAP'),
+       'build_target':os.environ.get('CARGO_BUILD_TARGET')})+'\n')
 manifest = p(args[args.index('--manifest-path')+1])
 source = manifest.parent
 if command == 'build':
@@ -415,10 +422,15 @@ class PipelineTests(unittest.TestCase):
         with self.assertRaises(installer.InstallError):
             installer.verify(stage)
 
-    def test_ambient_flags_rejected(self):
+    def test_ambient_flags_are_scoped_away_without_rejection_or_parent_mutation(self):
         with patch.dict(os.environ, {"RUSTFLAGS": "-Ctarget-cpu=generic"}):
-            with self.assertRaises(bk.BuildError):
-                self.builder.tools()
+            before = dict(os.environ)
+            self.builder.tools()
+            env, info = self.builder.cargo_context()
+            self.assertEqual(dict(os.environ), before)
+            self.assertNotIn("RUSTFLAGS", env)
+            self.assertNotIn("generic", env["CARGO_ENCODED_RUSTFLAGS"])
+            self.assertIn("RUSTFLAGS", info["overridden_ambient_variables"])
 
     def test_probe_uses_configured_c_and_cpp_flags(self):
         self.builder.doctor()
@@ -556,12 +568,16 @@ class PipelineTests(unittest.TestCase):
         with tarfile.open(archive) as tar:
             tar.extractall(unpack, filter="data")
         kit = next(unpack.iterdir())
-        env = dict(os.environ, PYTHONSAFEPATH="1", UPSTREAM_URL=str(self.remote))
+        shared = Path(self.temp.name) / "shared cache must remain absent"
+        env = dict(os.environ, PYTHONSAFEPATH="1", UPSTREAM_URL=str(self.remote),
+                   CARGO_TARGET_DIR=str(shared), CARGO_BUILD_TARGET_DIR=str(shared / "final"),
+                   CARGO_BUILD_BUILD_DIR=str(shared / "intermediate"))
         result = subprocess.run(
             ["make", "--no-print-directory", "-C", str(kit), "package", "verify", "OFFLINE=1"],
             env=env, text=True, capture_output=True, timeout=120,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(shared.exists())
         alias = kit / "dist/resctl-bench-latest.tar.gz"
         self.assertTrue(alias.is_file())
         self.assertTrue(alias.is_symlink())
@@ -592,6 +608,139 @@ class PipelineTests(unittest.TestCase):
             names = tar.getnames()
             for binary in self.cfg.binaries:
                 self.assertTrue(any(name.endswith("/bin/" + binary) for name in names))
+
+
+    def test_make_package_accepts_absolute_ambient_target_dir_and_preserves_shared_cache(self):
+        shared = Path(self.temp.name) / "host shared target with spaces"
+        shared.mkdir()
+        sentinel = shared / "do-not-touch"
+        sentinel.write_bytes(b"unrelated project's build cache\n")
+        before = (bk.file_manifest(shared), sentinel.stat().st_mtime_ns)
+        env = dict(os.environ, UPSTREAM_URL=str(self.remote), CARGO_TARGET_DIR=str(shared))
+        result = subprocess.run(["make", "--no-print-directory", "-C", str(self.root), "package", "verify"],
+                                env=env, text=True, capture_output=True, timeout=120)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("NOTE: Using project-local build settings", result.stderr)
+        self.assertNotIn("ERROR: Ambient", result.stderr)
+        self.assertEqual(before, (bk.file_manifest(shared), sentinel.stat().st_mtime_ns))
+        row = [row for row in self.calls() if row.get("command") == "build"][-1]
+        self.assertTrue(Path(row["target"]).is_relative_to(self.root / ".work/target"))
+        self.assertEqual(row["target"], row["build_target_dir"])
+        self.assertEqual(row["target"], row["build_build_dir"])
+        self.assertEqual(row["args"][row["args"].index("--target-dir") + 1], row["target"])
+        self.assertFalse(any("forbidden" in row for row in self.calls()))
+        info = bk.read_json(Path(bk.read_json(self.builder.work / "last-package.json")["stage"])
+                            / "share/resctl-bench/build/build-info.json")
+        self.assertIn("CARGO_TARGET_DIR", info["overridden_ambient_variables"])
+        self.assertEqual(info["cargo_target_dir"], row["target"])
+
+    def test_make_entrypoints_accept_combined_host_overrides_without_touching_configs(self):
+        shared = Path(self.temp.name) / "external shared build"
+        home = Path(self.temp.name) / "sentinel-home"
+        files = {
+            shared / "existing-cache": b"keep external cache\n",
+            home / ".profile": b"export CARGO_TARGET_DIR=/my/cache\n",
+            home / ".bashrc": b"# preserve user shell configuration\n",
+            home / ".rustup/settings.toml": b'default_toolchain = "existing-host"\n',
+            self.builder.cargo_home / "config.toml": b'[build]\ntarget-dir = "/shared/target"\n[net]\nretry = 2\n',
+            self.builder.cargo_home / "credentials.toml": b'[registry]\ntoken = "fixture-only"\n',
+            self.root / ".cargo/config.toml": b'[build]\nbuild-dir = "/shared/intermediate"\n',
+        }
+        for path, data in files.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        before = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in files}
+        overrides = {
+            "UPSTREAM_URL": str(self.remote), "HOME": str(home),
+            "CARGO_TARGET_DIR": str(shared), "CARGO_BUILD_TARGET_DIR": str(shared / "final"),
+            "CARGO_BUILD_BUILD_DIR": str(shared / "intermediate"),
+            "CARGO_BUILD_TARGET": "wasm32-unknown-unknown", "RUSTFLAGS": "--invalid-host-flag",
+            "CARGO_ENCODED_RUSTFLAGS": "--invalid-encoded-host-flag", "CARGO_BUILD_RUSTFLAGS": "--invalid",
+            "RUSTC_WRAPPER": "/missing/host-wrapper", "RUSTC_WORKSPACE_WRAPPER": "/missing/workspace-wrapper",
+            "CARGO_BUILD_RUSTC_WRAPPER": "/missing/alternate-wrapper", "RUSTC_BOOTSTRAP": "1",
+            "CARGO_PROFILE_RELEASE_LTO": "invalid", "CARGO_PROFILE_RELEASE_STRIP": "symbols",
+            "CARGO_PROFILE_RELEASE_PANIC": "abort", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER": "/missing/linker",
+            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS": "--invalid-target-flag",
+            "CFLAGS": "--invalid-cflag", "CXXFLAGS": "--invalid-cxxflag", "LDFLAGS": "--invalid-linkerflag",
+            "CFLAGS_x86_64_unknown_linux_gnu": "--invalid-target-cflag", "HOST_CFLAGS": "--invalid-host-cflag",
+            "AR": "/missing/archiver", "ARFLAGS": "--invalid-archiverflag", "CRATE_CC_NO_DEFAULTS": "1",
+        }
+        env = dict(os.environ, **overrides)
+        result = subprocess.run(["make", "--no-print-directory", "-C", str(self.root), "doctor",
+                                 "fetch-deps", "check", "test-compile", "package", "verify"],
+                                env=env, text=True, capture_output=True, timeout=120)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(before, {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in files})
+        self.assertEqual(set(shared.iterdir()), {shared / "existing-cache"})
+        calls = self.calls()
+        self.assertFalse(any("forbidden" in row for row in calls))
+        for row in calls:
+            self.assertTrue(Path(row["target"]).is_relative_to(self.root / ".work"))
+            self.assertEqual(row["target"], row["build_target_dir"])
+            self.assertEqual(row["target"], row["build_build_dir"])
+            self.assertEqual(row["wrapper"], "")
+            self.assertEqual(row["workspace_wrapper"], "")
+            self.assertIsNone(row["ambient_rustflags"])
+            self.assertIsNone(row["bootstrap"])
+            self.assertEqual(row["panic"], "unwind")
+            self.assertEqual(row["lto"], "thin")
+            self.assertEqual(row["build_target"], "x86_64-unknown-linux-gnu")
+
+    def test_relative_ambient_target_dir_does_not_write_under_source(self):
+        with patch.dict(os.environ, {"CARGO_TARGET_DIR": "../unexpected output",
+                                    "CARGO_BUILD_TARGET_DIR": "./unexpected-final",
+                                    "CARGO_BUILD_BUILD_DIR": "./unexpected-intermediate"}):
+            before = dict(os.environ)
+            self.builder.package()
+            self.assertEqual(dict(os.environ), before)
+            self.builder.verify_source()
+        self.assertFalse((self.root / "unexpected output").exists())
+        self.assertFalse((self.builder.src / "unexpected-final").exists())
+        self.assertFalse((self.builder.src / "unexpected-intermediate").exists())
+
+    def test_dependency_update_and_vendor_do_not_write_in_shared_target(self):
+        shared = Path(self.temp.name) / "never-created-external-target"
+        with patch.dict(os.environ, {"CARGO_TARGET_DIR": str(shared), "CARGO_BUILD_TARGET_DIR": str(shared),
+                                    "CARGO_BUILD_BUILD_DIR": str(shared), "RUSTFLAGS": "--invalid-ambient"}):
+            self.builder.update_dependencies()
+            self.builder.vendor()
+        self.assertFalse(shared.exists())
+        for row in self.calls():
+            self.assertEqual(row["target"], row["build_target_dir"])
+            self.assertEqual(row["target"], row["build_build_dir"])
+            self.assertTrue(Path(row["target"]).is_relative_to(self.builder.work))
+
+    def test_explicit_kit_flags_work_with_inherited_flags(self):
+        cfg = bk.Config.from_env({"UPSTREAM_URL": str(self.remote), "EXTRA_RUSTFLAGS": "--cfg kit_explicit",
+                                  "EXTRA_CFLAGS": "-DKIT_EXPLICIT_C=1", "EXTRA_CXXFLAGS": "-DKIT_EXPLICIT_CXX=1"})
+        builder = bk.Builder(self.root, cfg)
+        with patch.dict(os.environ, {"RUSTFLAGS": "--ambient-wrong", "CFLAGS": "--ambient-wrong",
+                                    "CXXFLAGS": "--ambient-wrong"}):
+            env, _ = builder.cargo_context()
+            self.assertIn("kit_explicit", env["CARGO_ENCODED_RUSTFLAGS"])
+            self.assertIn("-DKIT_EXPLICIT_C=1", env["CFLAGS"])
+            self.assertIn("-DKIT_EXPLICIT_CXX=1", env["CXXFLAGS"])
+            for name in ("CARGO_ENCODED_RUSTFLAGS", "CFLAGS", "CXXFLAGS"):
+                self.assertNotIn("--ambient-wrong", env[name])
+
+    def test_ignored_host_values_do_not_change_build_cache_identity(self):
+        with patch.dict(os.environ, {"CARGO_TARGET_DIR": "/first/host/cache", "RUSTFLAGS": "--first-ignored"}):
+            _, first = self.builder.cargo_context()
+        with patch.dict(os.environ, {"CARGO_TARGET_DIR": "/second/host/cache", "RUSTFLAGS": "--second-ignored"}):
+            _, second = self.builder.cargo_context()
+        self.assertEqual(first["build_id"], second["build_id"])
+
+    def test_clean_removes_only_local_work_not_inherited_shared_cache(self):
+        shared = Path(self.temp.name) / "shared-clean-sentinel"
+        shared.mkdir()
+        sentinel = shared / "preserve-me"
+        sentinel.write_text("unrelated build output\n")
+        env = dict(os.environ, UPSTREAM_URL=str(self.remote), CARGO_TARGET_DIR=str(shared))
+        result = subprocess.run(["make", "--no-print-directory", "-C", str(self.root), "package", "clean"],
+                                env=env, text=True, capture_output=True, timeout=120)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(self.builder.work.exists())
+        self.assertEqual(sentinel.read_text(), "unrelated build output\n")
 
 
 

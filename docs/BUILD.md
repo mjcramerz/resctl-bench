@@ -176,16 +176,40 @@ level, unstable compiler flags or mismatched cross-language LLVM LTO is enabled.
 required. Flags and effective compiler configuration are recorded with the
 host CPU signature, selected source/dependency locks and installed packages.
 
-Ambient RUSTFLAGS/CFLAGS, target/profile overrides and environment-specified
-compiler wrappers remain rejected when they make controlled flags ambiguous.
-Use `EXTRA_RUSTFLAGS`, `EXTRA_CFLAGS`, `EXTRA_CXXFLAGS` as reviewed build options;
-this rejection never edits the shell or its files. RUSTC/CARGO/RUSTDOC are
-accepted host-tool selectors. Existing Cargo **configuration files** are not
-rejected. Cargo merges those trusted settings with per-process build options.
+### Inherited Cargo/Rust/C/C++ settings (2.2.1 correction)
+
+An exported `CARGO_TARGET_DIR` is valid host configuration, not a build error.
+Do **not** unset it or modify your shell or Cargo config. The driver replaces
+conflicting build settings only in a copied child-process environment. It never
+mutates `os.environ`, your parent shell, or a global config file. A single `NOTE`
+lists overridden variable names, not their values; they are also recorded in
+`build-info.json` and `make doctor` output.
+
+Final and intermediate artifacts use the same project-local directory:
+`.work/target/<build-id>` for builds, checks and test compilation. The driver sets
+`CARGO_TARGET_DIR`, `CARGO_BUILD_TARGET_DIR` and `CARGO_BUILD_BUILD_DIR` together;
+compile commands also receive `--target-dir`. Auxiliary Cargo operations use
+`.work/cargo` or their own temporary directory under `.work/`. Existing shared
+build directories are not created, written to or cleaned by the driver.
+
+Inherited Rust/C/C++ flags, target/profile overrides, archiver overrides,
+compiler wrappers and bootstrap settings no longer cause an ambient-variable
+error. They are scoped away for this native, explicitly configured build. Rust
+compiler wrappers are disabled for kit Cargo invocations, including wrappers
+specified in Cargo config files. Use `EXTRA_RUSTFLAGS`, `EXTRA_CFLAGS`,
+`EXTRA_CXXFLAGS`, `TUNE`, `LTO`, `JOBS`, `HOST_CC` and `HOST_CXX` for intentional
+kit build choices. RUSTC/CARGO/RUSTDOC remain accepted host-tool selectors.
+Existing Cargo **configuration files** are not rejected. Cargo still reads
+registry, mirror, credential and proxy configuration; project-local process
+options take precedence for the settings controlled above. Those files are
+hashed for provenance, not rewritten. The exact controlled environment set is
+`CONTROLLED_BUILD_VARIABLES` plus the patterns in `controlled_build_variable()`.
 `CARGO_HOME` defaults to the host's `$HOME/.cargo`; an explicitly supplied value
 is honored, including configurations for mirrors/proxies. Project outputs are
 under `.work/`. A symlinked `.work` is refused. The build is not hermetic or a
-sandbox: upstream build scripts and user-configured wrappers run as the user.
+sandbox: upstream build scripts and any selected host-tool executables run as the user.
+Forced `[env]` entries or third-party executable side effects are trusted user
+inputs, not contained by this driver.
 
 `make doctor` compiles and executes tiny Rust/C/C++ probes; it is not a workload
 or a check of upstream compilation. `make check` runs Cargo check for selected

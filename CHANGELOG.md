@@ -1,5 +1,23 @@
 # Changes
 
+## 2.2.1 - 2026-09-16
+
+- Fix `make package` failing solely because the host exports `CARGO_TARGET_DIR`.
+  Replace the ambient-variable rejection with child-process-local overrides.
+- Apply the same policy to related Rust/Cargo/C/C++ flags, targets, profiles,
+  bootstrap settings, archivers and wrappers, rather than fail on the next
+  inherited variable. Keep host executable selection and Cargo cache/network/
+  registry/credential inputs available; never rewrite global configuration.
+- Set both Cargo target-directory variables and the separate intermediate
+  build-directory setting. Add explicit `--target-dir` to build/check/test.
+- Apply the policy to doctor, dependency operations, vendoring and packaging.
+  Disable Cargo compiler wrappers locally and record overridden names only.
+- Add direct-environment and real Make entrypoint regression coverage,
+  including extracted archives, paths with spaces, shared-cache sentinels,
+  configuration content/mtime preservation, and explicit flag options.
+- No change to the locked upstream source or the host-installed-only Rust policy.
+
+
 ## 2.2.0 - 2026-09-16
 
 * Default to host-installed Rust; support native Debian tools and existing Rustup

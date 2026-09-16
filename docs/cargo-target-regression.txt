@@ -1,0 +1,22 @@
+REPRODUCTION: Cargo/Rust are fixtures, not real upstream compilation.
+
+=== 2.2.0: exact reported failure ===
+ERROR: Ambient CARGO_TARGET_DIR makes the build ambiguous. Unset it; use documented kit options/EXTRA_*FLAGS.
+make: *** [Makefile:43: package] Error 1
+
+=== 2.2.1: same environment, corrected driver ===
+
+Created /tmp/tmpbh3anzrf/kit/dist/resctl-bench-0.1.0-x86_64-unknown-linux-gnu-native-844487cc5e7b805c.tar.gz
+SHA256 e124cbdf4c004abd65336daa246915b8b7cb60ca065b2acc3fe92d3899ebf32b
+Binary tarball: /tmp/tmpbh3anzrf/kit/dist/resctl-bench-latest.tar.gz
+NOTE: Using project-local build settings instead of inherited CARGO_TARGET_DIR. Host environment/config files are unchanged; outputs stay in .work/. Use EXTRA_*FLAGS/TUNE/LTO/JOBS for explicit kit overrides.
+Fetching /tmp/tmpbh3anzrf/remote at main
+Locked upstream commit: d24fff706b7f63ea0360b9b1172bd8b6629ba47d
++ /tmp/tmpbh3anzrf/fakebin/cargo build --manifest-path /tmp/tmpbh3anzrf/kit/upstream/Cargo.toml --locked --release --target x86_64-unknown-linux-gnu --jobs 1 -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo --bins --target-dir /tmp/tmpbh3anzrf/kit/.work/target/844487cc5e7b805c
+Synthetic build completed; not upstream Rust
++ /tmp/tmpbh3anzrf/fakebin/cargo metadata --manifest-path /tmp/tmpbh3anzrf/kit/upstream/Cargo.toml --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu
++ /tmp/tmpbh3anzrf/fakebin/cargo tree --manifest-path /tmp/tmpbh3anzrf/kit/upstream/Cargo.toml --locked --target x86_64-unknown-linux-gnu --edges normal,build -p resctl-bench -p rd-agent -p rd-hashd -p resctl-demo
+
+=== 2.2.1: verify ===
+Archive and staged files verified
++ /usr/bin/python3 -I -B /tmp/tmpbh3anzrf/kit/scripts/install.py --package /tmp/tmpbh3anzrf/kit/.work/stage/resctl-bench-0.1.0-x86_64-unknown-linux-gnu-native-844487cc5e7b805c --verify

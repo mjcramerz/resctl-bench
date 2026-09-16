@@ -1,4 +1,12 @@
-# resctl-bench build kit 2.2.0 - host Rust, no toolchain installation
+# resctl-bench build kit 2.2.1 - host Rust, no toolchain installation
+
+**2.2.1 fixes the inherited `CARGO_TARGET_DIR` failure.** Keep your existing
+shell environment and global Cargo configuration. `make package` now scopes
+conflicting build variables away in its child processes instead of rejecting
+them. Final and intermediate output stays under project-local `.work/`; your
+shared Cargo target directory is not touched. Registry/proxy/credential settings
+and `CARGO_HOME` remain available. Host Rust is still used without installation.
+
 
 This version builds with Rust already installed on your host. It does not
 install, update, or select a new Rust release, change a Rustup default/override,
@@ -63,7 +71,7 @@ configuration. To deliberately use a separate cache, pass a project-local
 
 ## Complete source, not a patch-only kit
 
-The `resctl-bench-buildkit-2.2.0-host-rust.tar.gz` source snapshot includes the
+The `resctl-bench-buildkit-2.2.1-host-rust.tar.gz` source snapshot includes the
 full supplied upstream workspace, Cargo manifests/lock, documentation, licenses,
 minimal real Git object store, build scripts, tests, and host-only defaults.
 The source commit is `bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b`. All 163 upstream
