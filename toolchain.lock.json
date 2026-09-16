@@ -1,0 +1,13 @@
+{
+  "cargo_version": "cargo 1.100.0-nightly (7941be6fb 2026-09-11)",
+  "executables": {
+    "cargo": "/pool/db/mcramer/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin/cargo",
+    "rustc": "/pool/db/mcramer/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin/rustc",
+    "rustdoc": "/pool/db/mcramer/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin/rustdoc"
+  },
+  "policy": "host-installed-only",
+  "requested_toolchain": "host",
+  "resolved_toolchain": "host",
+  "rustc_vv": "rustc 1.100.0-nightly (574ff7d98 2026-09-14)\nbinary: rustc\ncommit-hash: 574ff7d98bd6d037e5236a8453029173b32631fd\ncommit-date: 2026-09-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.100.0-nightly\nLLVM version: 23.1.1\n",
+  "schema": 2
+}
