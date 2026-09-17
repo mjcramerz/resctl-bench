@@ -1,3 +1,21 @@
+# 2.3.3 - Restrictive-umask packaging and publication/install repair
+
+The exact reported `biolatpcts.py` mode failure was reproduced after ordinary-user
+tar extraction under umask 077. The build kit now separates source-byte
+validation from the strict 0755 compiled-helper export contract, without
+chmodding private sources or weakening hashes, source locks or runtime checks.
+Install/verify require a successful package publication and give actionable
+recovery instructions for missing, stale or damaged state. Added extraction,
+packaging, installation and matched-Lab regressions for umasks 022/027/077.
+All earlier native patches, helper hashes and the v2 native marker remain unchanged.
+See docs/PACKAGING-REPAIR.md and docs/VALIDATION.md.
+
+# 2.3.2 - Native runtime failure handling and matched Lab contract
+
+See docs/DELIVERY-REPAIR.md for the current uploaded failure diagnosis, code
+changes, host preparation and validation limits. Older entries below describe
+their own input evidence, not a successful run of this revision.
+
 # 2.3.1 - complete offline-recoverable source repository
 
 - Ship all 163 patched working files plus a hash-pinned local source/Git snapshot.

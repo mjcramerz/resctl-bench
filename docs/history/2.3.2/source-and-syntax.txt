@@ -1,0 +1,2 @@
+Verified complete patched source, Cargo.lock and offline recovery archive
+Syntax/whitespace checks passed: 16 Python files

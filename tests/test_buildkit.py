@@ -193,9 +193,9 @@ elif command == 'update':
     if os.environ.get('FIXTURE_UPDATE_TAMPER') == '1':
         (source/'README.md').write_text('illegal resolver mutation')
 elif command in ('check','test','fetch'):
-    if command == 'test' and any(x in args for x in ('misc::support_tests::', 'storage_info::source_resolution_tests::')):
+    if command == 'test' and any(x in args for x in ('misc::support_tests::', 'storage_info::source_resolution_tests::', 'slices::io_policy_tests::', 'runtime_contract_tests::')):
         print('SYNTHETIC Cargo fixture; no Rust tests executed')
-        n = 10 if 'misc::support_tests::' in args else 8
+        n = next(n for f,n in [('misc::support_tests::',10), ('storage_info::source_resolution_tests::',8), ('slices::io_policy_tests::',6), ('runtime_contract_tests::',3)] if f in args)
         print(f'test result: ok. {n} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;')
 else:
     sys.exit('unexpected cargo command: '+repr(args))
@@ -223,6 +223,7 @@ class PipelineTests(unittest.TestCase):
 struct asset { const char *name; const char *body; };
 static const struct asset assets[] = {''' + declarations + '''};
 int main(int argc, char **argv) {
+  if (argc == 2 && strcmp(argv[1], "--runtime-contract") == 0) { puts("resctl-iocost-lab-v2"); return 0; }
   if (argc == 3 && strcmp(argv[1], "--export-support") == 0) {
     if (mkdir(argv[2], 0700) != 0) return 2;
     for (unsigned int i = 0; i < sizeof(assets)/sizeof(assets[0]); i++) {
@@ -333,6 +334,54 @@ int main(int argc, char **argv) {
         first = self.builder.fetch()
         shutil.rmtree(self.builder.src)
         self.assertEqual(first, self.builder.fetch())
+
+    def test_extracted_package_verify_install_with_restrictive_umasks(self):
+        # Real GNU tar, Make, staging, ELF/debug checks, export validation and
+        # installer. Cargo and the native program remain labelled test doubles.
+        self.builder.fetch()
+        archive = self.builder.snapshot_dist()
+        for mask, mode in ((0o022, 0o755), (0o027, 0o750), (0o077, 0o700)):
+            with self.subTest(umask=oct(mask)):
+                dest = Path(self.temp.name) / ("extracted source " + str(mask))
+                dest.mkdir()
+                subprocess.run(["tar", "--no-same-permissions", "-xzf", str(archive), "-C", str(dest)],
+                               check=True, capture_output=True, umask=mask)
+                kit = dest / "resctl-bench"
+                helper = kit / "upstream/rd-agent/src/misc/biolatpcts.py"
+                self.assertEqual(helper.stat().st_mode & 0o777, mode)
+                env = {**os.environ, "UPSTREAM_URL": str(self.remote), "JOBS": "1"}
+                result = subprocess.run(["make", "--no-print-directory", "package", "verify"],
+                                        cwd=kit, env=env, text=True, capture_output=True,
+                                        timeout=120, umask=mask)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(helper.stat().st_mode & 0o777, mode)
+                last = bk.read_json(kit / ".work/last-package.json")
+                stage = Path(last["stage"])
+                self.assertTrue(Path(last["path"]).is_file())
+                verification = bk.read_json(stage / "share/resctl-bench/build/compiled-support.json")
+                self.assertTrue(verification["verified"])
+                self.assertFalse(verification["bpf_attached"])
+                prefix = dest / "test destination"
+                prefix.mkdir(mode=0o700)
+                result = subprocess.run([str(kit / "BUILD.sh"), "install", "DESTDIR=" + str(prefix)],
+                                        cwd=dest, env=env, text=True, capture_output=True,
+                                        timeout=30, umask=mask)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(prefix.stat().st_mode & 0o777, 0o700)
+                for directory in ("usr", "usr/local", "usr/local/bin", "usr/local/bin/.debug",
+                                  "usr/local/share", "usr/local/share/resctl-bench"):
+                    self.assertEqual((prefix / directory).stat().st_mode & 0o777, 0o755)
+                for binary in self.cfg.binaries:
+                    installed = prefix / "usr/local/bin" / binary
+                    self.assertEqual(installed.stat().st_mode & 0o777, 0o755)
+                    self.assertEqual(bk.digest(installed), bk.digest(stage / "bin" / binary))
+                calls = len(self.calls())
+                Path(last["path"]).write_bytes(b"fixture corruption")
+                result = subprocess.run(["make", "--no-print-directory", "install", "DESTDIR=" + str(prefix)],
+                                        cwd=kit, env=env, text=True, capture_output=True, timeout=30)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("checksum/path mismatch", result.stderr)
+                self.assertEqual(len(self.calls()), calls)  # install never calls Cargo
 
     def test_full_pipeline_real_elf_debug_archive_install(self):
         archive = self.builder.package()

@@ -65,7 +65,7 @@
   },
   "rd-agent-intf/src/args.rs": {
     "mode": 420,
-    "sha256": "dc7e5bb4a07c5ff006956b5acfe89766ec1f5d51e9d4c0698c6aef4b4eff24da"
+    "sha256": "d8d25c2700b0457a6c6c5686675bf5097229af54bd162e71a01774bd66190172"
   },
   "rd-agent-intf/src/bandit_report.rs": {
     "mode": 420,
@@ -121,7 +121,7 @@
   },
   "rd-agent/README.md": {
     "mode": 420,
-    "sha256": "00d591e95014944b93cef7edd5b2be3a7b1e80afc1104b40c07f817628d49921"
+    "sha256": "b6f724aceb3de5b391766fcb423a76da76344baea103802a4ed71dd119594696"
   },
   "rd-agent/src/bandit.rs": {
     "mode": 420,
@@ -145,7 +145,7 @@
   },
   "rd-agent/src/main.rs": {
     "mode": 420,
-    "sha256": "323baf55270de0d734ad04075712d4c7a2ff64a0c182f36bf0a116ee7278d5b5"
+    "sha256": "cbfc8a4e501318c99bc18508325d7f83d7ff0735f4680324b9af7a01e4cac1ae"
   },
   "rd-agent/src/misc.rs": {
     "mode": 420,
@@ -173,7 +173,7 @@
   },
   "rd-agent/src/report.rs": {
     "mode": 420,
-    "sha256": "cb5983bb90fe3fec06d3094fa0d5765207efc51a112243b52e8e2bba4689f163"
+    "sha256": "6fe8d7db5413d5f55528196b1b27db00338cdf3f15f37124e3546b490254db6d"
   },
   "rd-agent/src/side.rs": {
     "mode": 420,
@@ -209,7 +209,7 @@
   },
   "rd-agent/src/slices.rs": {
     "mode": 420,
-    "sha256": "e712d52f4d032965a478dd0258c315bf0c823a74aff2792828de7d80e63a5d0c"
+    "sha256": "b4f67614eec5a61181f1a152ab9bb81fee08420aad7138f12e95e52f3999db89"
   },
   "rd-hashd-intf/Cargo.toml": {
     "mode": 420,
@@ -265,7 +265,7 @@
   },
   "rd-hashd/src/main.rs": {
     "mode": 420,
-    "sha256": "d04824b8da2102fd0d51cf314a093c5767c306150a4c40446295055d8026a23a"
+    "sha256": "091d6d7f46aa4d93d73fbe80b2fb630897452816bb6d67cd8fe1eef9e18019f0"
   },
   "rd-hashd/src/testfiles.rs": {
     "mode": 420,
@@ -309,7 +309,7 @@
   },
   "rd-util/src/lib.rs": {
     "mode": 420,
-    "sha256": "5638a9428d258a51b60c3973b21c75272d3f46e0450dd287f6636c6b458034a0"
+    "sha256": "689ce71c4a96416e2c6bc24f321e77f9c789c00e5ed24d22fa460f0a8c5495a4"
   },
   "rd-util/src/storage_info.rs": {
     "mode": 420,
@@ -473,7 +473,7 @@
   },
   "resctl-bench/src/main.rs": {
     "mode": 420,
-    "sha256": "99545cb079e9edcf118464a6410284f3b511643edfc30cb134143a831d22c0ac"
+    "sha256": "ecd085bdb3e89b8d6e9f947f9adabb0fd5453965c3f78651d528ad390c1ca213"
   },
   "resctl-bench/src/merge.rs": {
     "mode": 420,
@@ -637,7 +637,7 @@
   },
   "resctl-demo/src/main.rs": {
     "mode": 420,
-    "sha256": "6f955facc4c21b0dc8bf818c5cdadf6a780883fe604e2a7e08de37ffd1fb30bd"
+    "sha256": "487821fdd87d5e2ea15c7bba1402fececbc89b9a28e5d41cd30bf877238c8b7a"
   },
   "resctl-demo/src/report_ring.rs": {
     "mode": 420,

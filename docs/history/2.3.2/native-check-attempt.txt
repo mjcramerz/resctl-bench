@@ -1,0 +1,4 @@
+ERROR: Host rustc not found: 'rustc'. Put the installed tools on PATH or set HOST_RUSTC=/absolute/path. Automatic Rust installation is disabled; no host configuration was changed.
+make: *** [Makefile:48: check] Error 1
+
+EXIT_STATUS=2

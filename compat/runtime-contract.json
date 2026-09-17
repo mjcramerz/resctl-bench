@@ -11,8 +11,9 @@
     "iocost_coef_gen.py": "459ad36aa658dd7c2d44aebb307a21f9b2399d73440012a2c1a70b9f4111ff91",
     "sideloader.py": "15ffbe43fd829f48515b621fcc541649bddc24ed6d53ca384fdfe9385ec0feec"
   },
-  "id": "resctl-2.2.6-embedded-bcc-compat-v1",
+  "id": "embedded-runtime-compat-v2",
   "iocost_lab_1_5_helper_bytes_compatible": true,
+  "native_contract": "resctl-iocost-lab-v2",
   "result_schema": "resctl-bench-2.2.6",
   "schema": 1
 }

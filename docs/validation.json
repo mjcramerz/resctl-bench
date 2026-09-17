@@ -1,47 +1,62 @@
 {
-  "schema": 1,
-  "release": "2.3.1",
-  "native_version": "2.2.6",
-  "verified_at_utc": "2026-09-16T22:18:29.551553+00:00",
-  "source_commit": "bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b",
-  "all_163_repaired_source_files_unchanged_from_2_3_0": true,
-  "source_recovery": "actual Git, filesystem, archive and Make operations; no source-network access",
-  "python_and_build_system_tests": {
-    "tests_run": 204,
-    "failures": 0,
+  "fresh_extraction_restrictive_umask_suite": {
     "errors": 0,
+    "failures": 0,
+    "fresh_archive_extraction": true,
+    "run_as": "ordinary user",
+    "seconds": 173.48,
     "skipped": 0,
-    "success": true,
-    "seconds": 125.4384253025055,
-    "rust_compiled": false,
-    "real_git_recovery_tests": true,
-    "details": []
+    "tests": 238,
+    "umask": "077"
   },
-  "new_source_recovery_tests": 32,
-  "new_lab_interface_tests": 10,
-  "actual_lab_2_0_help_probe": {
-    "lab": "2.0.0",
-    "probe": "run --help only",
-    "detected_option": "--bin-dir",
-    "benchmark_executed": false
+  "full_software_suite": {
+    "errors": 0,
+    "failures": 0,
+    "fresh_archive_extraction": false,
+    "run_as": "root",
+    "seconds": 173.285,
+    "skipped": 0,
+    "tests": 238,
+    "umask": "022"
   },
-  "python_syntax_files": 23,
-  "shell_syntax_checked": [
-    "BUILD.sh",
-    "RUN-IOCOST-LAB.sh",
-    "upstream/rd-agent/src/misc/biolatpcts_wrapper.sh"
+  "mode_regression": {
+    "compiled_export_0755_requirement_retained": true,
+    "details": "mode-reproduction.json",
+    "extraction_umasks": [
+      "022",
+      "027",
+      "077"
+    ],
+    "ordinary_user_uid": 1000,
+    "original_2_3_2_error_reproduced": true,
+    "source_mode_not_changed": true
+  },
+  "native_build_attempt": {
+    "command": "ALLOW_UNSUPPORTED_DEBIAN=1 ./BUILD.sh native-validate",
+    "compiler_invoked": false,
+    "details": "native-check-attempt.txt",
+    "exit_status": 2,
+    "reason": "Host rustc not found",
+    "run_as": "ordinary user"
+  },
+  "notes": [
+    "C ELF/Cargo/BCC pipeline fixtures are synthetic, not compiled resctl or live hardware.",
+    "All 163 native source files and locked/recovery assets are retained from 2.3.2.",
+    "Root and ordinary-user test logs are from this revision; prior-release records are under history/.",
+    "The CI workflow was updated but was not executed here."
   ],
-  "compiled_rust_workspace": false,
-  "native_rust_tests_executed": false,
-  "pipeline_compiler_fixtures": "explicitly synthetic Rust/Cargo with real Git, C ELF and package verification",
-  "real_bpf_attachment": false,
-  "hardware_benchmark": false,
-  "installed_or_changed_host_swap": false,
-  "runtime_binaries_in_source_release": false,
-  "vendored_third_party_crates": false,
-  "toolchain_availability": {
-    "rustc": null,
-    "cargo": null,
-    "rustdoc": null
-  }
+  "release": "2.3.3",
+  "runtime_contract": "resctl-iocost-lab-v2",
+  "schema": 1,
+  "scope": {
+    "actual_rust_compilation": false,
+    "actual_rust_tests": false,
+    "cargo_dependencies_vendored": false,
+    "live_bpf": false,
+    "live_systemd_service_changes": false,
+    "physical_calibration": false,
+    "real_measured_hwdb_deployment": false,
+    "real_swap_changes": false
+  },
+  "validation_date": "2026-09-17"
 }

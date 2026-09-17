@@ -1,0 +1,200 @@
+[
+  {
+    "umask": "0o22",
+    "uid": 1000,
+    "modes_before": {
+      "biolatpcts.py": "0o755",
+      "biolatpcts_wrapper.sh": "0o755",
+      "sideloader.py": "0o755",
+      "iocost_coef_gen.py": "0o755"
+    },
+    "modes_after": {
+      "biolatpcts.py": "0o755",
+      "biolatpcts_wrapper.sh": "0o755",
+      "sideloader.py": "0o755",
+      "iocost_coef_gen.py": "0o755"
+    },
+    "source_modes_unchanged": true,
+    "original_package": {
+      "command": [
+        "make",
+        "--no-print-directory",
+        "package"
+      ],
+      "exit_status": 2,
+      "stdout": "",
+      "stderr": "ERROR: Host rustc not found: 'rustc'. Put the installed tools on PATH or set HOST_RUSTC=/absolute/path. Automatic Rust installation is disabled; no host configuration was changed.\nmake: *** [Makefile:48: package] Error 1\n"
+    },
+    "original_install": {
+      "command": [
+        "./BUILD.sh",
+        "install"
+      ],
+      "exit_status": 2,
+      "stdout": "",
+      "stderr": "ERROR: Cannot read /tmp/real-user-extraction-q78jozyd/resctl-bench/.work/last-package.json: [Errno 2] No such file or directory: '/tmp/real-user-extraction-q78jozyd/resctl-bench/.work/last-package.json'\nmake: *** [Makefile:48: install] Error 1\n"
+    },
+    "patched_verify_source": {
+      "command": [
+        "make",
+        "--no-print-directory",
+        "verify-source"
+      ],
+      "exit_status": 0,
+      "stdout": "Verified complete patched source, Cargo.lock and offline recovery archive\n",
+      "stderr": ""
+    },
+    "patched_package": {
+      "command": [
+        "make",
+        "--no-print-directory",
+        "package"
+      ],
+      "exit_status": 2,
+      "stdout": "",
+      "stderr": "ERROR: Host rustc not found: 'rustc'. Put the installed tools on PATH or set HOST_RUSTC=/absolute/path. Automatic Rust installation is disabled; no host configuration was changed.\nmake: *** [Makefile:48: package] Error 1\n"
+    },
+    "patched_install": {
+      "command": [
+        "./BUILD.sh",
+        "install"
+      ],
+      "exit_status": 2,
+      "stdout": "",
+      "stderr": "ERROR: No successfully completed package is available: /tmp/real-user-extraction-q78jozyd/resctl-bench/.work/last-package.json. A failed build (or make clean) leaves no install manifest. Run make package verify as your ordinary user in this source directory. Resolve its FIRST error; only after it succeeds run sudo ./BUILD.sh install. Installation does not build, and no system files were changed.\nmake: *** [Makefile:48: install] Error 1\n"
+    },
+    "native_compiler_invoked": false
+  },
+  {
+    "umask": "0o27",
+    "uid": 1000,
+    "modes_before": {
+      "biolatpcts.py": "0o750",
+      "biolatpcts_wrapper.sh": "0o750",
+      "sideloader.py": "0o750",
+      "iocost_coef_gen.py": "0o750"
+    },
+    "modes_after": {
+      "biolatpcts.py": "0o750",
+      "biolatpcts_wrapper.sh": "0o750",
+      "sideloader.py": "0o750",
+      "iocost_coef_gen.py": "0o750"
+    },
+    "source_modes_unchanged": true,
+    "original_package": {
+      "command": [
+        "make",
+        "--no-print-directory",
+        "package"
+      ],
+      "exit_status": 2,
+      "stdout": "",
+      "stderr": "ERROR: Support file does not have the required executable mode: biolatpcts.py\nmake: *** [Makefile:48: package] Error 1\n"
+    },
+    "original_install": {
+      "command": [
+        "./BUILD.sh",
+        "install"
+      ],
+      "exit_status": 2,
+      "stdout": "",
+      "stderr": "ERROR: Cannot read /tmp/real-user-extraction-f6g19cs_/resctl-bench/.work/last-package.json: [Errno 2] No such file or directory: '/tmp/real-user-extraction-f6g19cs_/resctl-bench/.work/last-package.json'\nmake: *** [Makefile:48: install] Error 1\n"
+    },
+    "patched_verify_source": {
+      "command": [
+        "make",
+        "--no-print-directory",
+        "verify-source"
+      ],
+      "exit_status": 0,
+      "stdout": "Verified complete patched source, Cargo.lock and offline recovery archive\n",
+      "stderr": ""
+    },
+    "patched_package": {
+      "command": [
+        "make",
+        "--no-print-directory",
+        "package"
+      ],
+      "exit_status": 2,
+      "stdout": "",
+      "stderr": "ERROR: Host rustc not found: 'rustc'. Put the installed tools on PATH or set HOST_RUSTC=/absolute/path. Automatic Rust installation is disabled; no host configuration was changed.\nmake: *** [Makefile:48: package] Error 1\n"
+    },
+    "patched_install": {
+      "command": [
+        "./BUILD.sh",
+        "install"
+      ],
+      "exit_status": 2,
+      "stdout": "",
+      "stderr": "ERROR: No successfully completed package is available: /tmp/real-user-extraction-f6g19cs_/resctl-bench/.work/last-package.json. A failed build (or make clean) leaves no install manifest. Run make package verify as your ordinary user in this source directory. Resolve its FIRST error; only after it succeeds run sudo ./BUILD.sh install. Installation does not build, and no system files were changed.\nmake: *** [Makefile:48: install] Error 1\n"
+    },
+    "native_compiler_invoked": false
+  },
+  {
+    "umask": "0o77",
+    "uid": 1000,
+    "modes_before": {
+      "biolatpcts.py": "0o700",
+      "biolatpcts_wrapper.sh": "0o700",
+      "sideloader.py": "0o700",
+      "iocost_coef_gen.py": "0o700"
+    },
+    "modes_after": {
+      "biolatpcts.py": "0o700",
+      "biolatpcts_wrapper.sh": "0o700",
+      "sideloader.py": "0o700",
+      "iocost_coef_gen.py": "0o700"
+    },
+    "source_modes_unchanged": true,
+    "original_package": {
+      "command": [
+        "make",
+        "--no-print-directory",
+        "package"
+      ],
+      "exit_status": 2,
+      "stdout": "",
+      "stderr": "ERROR: Support file does not have the required executable mode: biolatpcts.py\nmake: *** [Makefile:48: package] Error 1\n"
+    },
+    "original_install": {
+      "command": [
+        "./BUILD.sh",
+        "install"
+      ],
+      "exit_status": 2,
+      "stdout": "",
+      "stderr": "ERROR: Cannot read /tmp/real-user-extraction-d8ex5ecm/resctl-bench/.work/last-package.json: [Errno 2] No such file or directory: '/tmp/real-user-extraction-d8ex5ecm/resctl-bench/.work/last-package.json'\nmake: *** [Makefile:48: install] Error 1\n"
+    },
+    "patched_verify_source": {
+      "command": [
+        "make",
+        "--no-print-directory",
+        "verify-source"
+      ],
+      "exit_status": 0,
+      "stdout": "Verified complete patched source, Cargo.lock and offline recovery archive\n",
+      "stderr": ""
+    },
+    "patched_package": {
+      "command": [
+        "make",
+        "--no-print-directory",
+        "package"
+      ],
+      "exit_status": 2,
+      "stdout": "",
+      "stderr": "ERROR: Host rustc not found: 'rustc'. Put the installed tools on PATH or set HOST_RUSTC=/absolute/path. Automatic Rust installation is disabled; no host configuration was changed.\nmake: *** [Makefile:48: package] Error 1\n"
+    },
+    "patched_install": {
+      "command": [
+        "./BUILD.sh",
+        "install"
+      ],
+      "exit_status": 2,
+      "stdout": "",
+      "stderr": "ERROR: No successfully completed package is available: /tmp/real-user-extraction-d8ex5ecm/resctl-bench/.work/last-package.json. A failed build (or make clean) leaves no install manifest. Run make package verify as your ordinary user in this source directory. Resolve its FIRST error; only after it succeeds run sudo ./BUILD.sh install. Installation does not build, and no system files were changed.\nmake: *** [Makefile:48: install] Error 1\n"
+    },
+    "native_compiler_invoked": false
+  }
+]

@@ -55,3 +55,9 @@ test:
 runtime-check:
 	@cd "$(PROJECT_DIR)" && $(PYTHON) $(PYTHON_FLAGS) scripts/runtime_check.py
 export SCRATCH
+
+# Full native compiler gate. Run as an ordinary build user with installed Rust.
+# package itself runs only reviewed, non-hardware Rust test filters.
+.PHONY: native-validate
+native-validate:
+	@$(MAKE) --no-print-directory -C "$(PROJECT_DIR)" verify-source doctor check test-compile package verify

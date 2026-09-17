@@ -60,14 +60,14 @@ host_rust = _load_helper("host_rust")
 runtime_support = _load_helper("runtime_support")
 source_archive = _load_helper("source_archive")
 
-VERSION = "2.3.1"
+VERSION = "2.3.3"
 ROOT = Path(__file__).resolve().parents[1]
 GIB = 1024**3
 BASE_BINS = ("resctl-bench", "rd-agent", "rd-hashd")
 KIT_ITEMS = ("Makefile", "README.md", "LICENSE", "NOTICE.md", ".gitignore",
              ".editorconfig", "config.mk.example", "scripts", "tests", "docs",
              "packages", ".github", "CHANGELOG.md", "compat", "patches", "RUN-IOCOST-LAB.sh", "BUILD.sh")
-HELP = """resctl-bench-buildkit 2.3.1 (Debian Forky, native amd64/arm64 GNU/Linux)
+HELP = """resctl-bench-buildkit 2.3.3 (Debian Forky, native amd64/arm64 GNU/Linux)
 
   make                  Same as make package (host Rust; locked source)
   make package          Build locked sources with host Rust; no APT or toolchain changes
@@ -81,6 +81,7 @@ HELP = """resctl-bench-buildkit 2.3.1 (Debian Forky, native amd64/arm64 GNU/Linu
   make update-rustup    DISABLED: this kit never installs or updates rustup
   make update-deps      Resolve newest compatible crates into a separate, audited lock
   make versions         Show source/toolchain/dependency locks and local package versions
+  make native-validate  Verify source, check, compile tests, package and verify with REAL host Rust
   make doctor           Validate installed compiler, host, tools and flags
   make fetch            Verify/restore complete bundled source; no network for this release
   make verify-source    Read-only verification of patched source and recovery archive
@@ -629,7 +630,7 @@ class Builder:
                 self.restore_source()
             elif not self.src.is_dir():
                 raise BuildError("This older source lock has no offline recovery asset. "
-                                 "Use the complete 2.3.1+ source repository; "
+                                 "Use the complete 2.3.2+ source repository; "
                                  "an unpatched remote checkout is never a fallback.")
         if locked and self.src.exists():
             current = self.verify_source()
@@ -1054,9 +1055,11 @@ class Builder:
         selections = [
             ("rd-agent", ["--bin", "rd-agent"], "misc::support_tests::", 10),
             ("rd-util", ["--lib"], "storage_info::source_resolution_tests::", 8),
+            ("rd-agent", ["--bin", "rd-agent"], "slices::io_policy_tests::", 6),
+            ("rd-util", ["--lib"], "runtime_contract_tests::", 3),
         ]
         for package, kind, selector, minimum in selections:
-            log = out / ("runtime-unit-tests-" + package + ".log")
+            log = out / ("runtime-unit-tests-" + package + "-" + selector.replace("::", "-").strip("-") + ".log")
             self.cargo("test", ["--release", "--target", settings["host"],
                        "--jobs", str(self.cfg.jobs), "-p", package, *kind,
                        selector, "--", "--test-threads=1"], env, log=log)
@@ -1382,6 +1385,50 @@ class Builder:
         print(destination)
         return destination
 
+    def last_package(self) -> dict[str, Any]:
+        """Read a completed publication, never infer success from leftover files.
+
+        Failed package attempts deliberately remove this pointer. Installation
+        must not compile as root, create a substitute manifest, or reuse an old
+        stage after a newer build failed.
+        """
+        record = self.work / "last-package.json"
+        recovery = ("Run make package verify as your ordinary user in this source directory. "
+                    "Resolve its FIRST error; only after it succeeds run sudo ./BUILD.sh install. "
+                    "Installation does not build, and no system files were changed.")
+        if not record.exists():
+            raise BuildError("No successfully completed package is available: " + str(record)
+                             + ". A failed build (or make clean) leaves no install manifest. " + recovery)
+        if self.work.is_symlink() or record.is_symlink() or not record.is_file():
+            raise BuildError("Unsafe last-package manifest: " + str(record))
+        try:
+            last = read_json(record)
+        except BuildError as exc:
+            raise BuildError("Invalid last-package manifest. " + recovery) from exc
+        if (not isinstance(last, dict)
+                or not isinstance(last.get("stage"), str) or not last["stage"]
+                or not isinstance(last.get("path"), str) or not last["path"]
+                or not isinstance(last.get("sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", last["sha256"])):
+            raise BuildError("Invalid last-package manifest. " + recovery)
+        stage, archive = Path(last["stage"]), Path(last["path"])
+        for path, parent, label in ((stage, self.work / "stage", "stage"),
+                                    (archive, self.dist, "archive")):
+            if (not path.is_absolute() or ".." in path.parts
+                    or path == parent or not path.is_relative_to(parent)
+                    or not path.resolve().is_relative_to(parent.resolve())):
+                raise BuildError("Unsafe last-package " + label + " path. " + recovery)
+            current = path
+            while current != self.root:
+                if current.is_symlink():
+                    raise BuildError("Symlink in last-package " + label + " path: " + str(current))
+                current = current.parent
+        if not stage.is_dir():
+            raise BuildError("The completed package stage is missing: " + str(stage) + ". " + recovery)
+        if not archive.is_file() or digest(archive) != last["sha256"]:
+            raise BuildError("Release archive checksum/path mismatch. " + recovery)
+        return last
+
     def install(self, uninstall: bool = False) -> None:
         cmd: list[str | Path] = [sys.executable, "-I", "-B", self.root / "scripts/install.py",
                                 "--prefix", os.environ.get("PREFIX", "/usr/local")]
@@ -1390,10 +1437,8 @@ class Builder:
         if uninstall:
             cmd.append("--uninstall")
         else:
-            last = read_json(self.work / "last-package.json")
+            last = self.last_package()
             stage = Path(last["stage"])
-            if not stage.resolve().is_relative_to((self.work / "stage").resolve()):
-                raise BuildError("Unsafe last-package stage path")
             cmd += ["--package", stage]
             if boolean(os.environ, "FORCE", "0"):
                 cmd.append("--force")
@@ -1501,10 +1546,7 @@ def main() -> int:
         elif action in ("source-dist", "kit-dist"):
             builder.source_dist(kit_only=action == "kit-dist")
         elif action == "verify":
-            last = read_json(builder.work / "last-package.json")
-            path = Path(last["path"])
-            if not path.resolve().is_relative_to(builder.dist.resolve()) or digest(path) != last["sha256"]:
-                raise BuildError("Release archive checksum/path mismatch")
+            last = builder.last_package()
             run([sys.executable, "-I", "-B", ROOT / "scripts/install.py", "--package", last["stage"], "--verify"])
             print("Archive and staged files verified")
         elif action == "clean":

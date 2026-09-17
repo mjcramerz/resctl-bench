@@ -1,0 +1,25 @@
+test_damaged_archive_is_not_installed (test_package_permissions.CompletedPackageTests.test_damaged_archive_is_not_installed) ... ok
+test_failed_new_attempt_cannot_reuse_old_published_package (test_package_permissions.CompletedPackageTests.test_failed_new_attempt_cannot_reuse_old_published_package) ... ok
+test_invalid_json_is_actionable (test_package_permissions.CompletedPackageTests.test_invalid_json_is_actionable) ... ok
+test_invalid_manifest_shapes_are_rejected (test_package_permissions.CompletedPackageTests.test_invalid_manifest_shapes_are_rejected) ... ok
+test_last_package_returns_validated_record (test_package_permissions.CompletedPackageTests.test_last_package_returns_validated_record) ... ok
+test_manifest_symlink_is_rejected (test_package_permissions.CompletedPackageTests.test_manifest_symlink_is_rejected) ... ok
+test_missing_archive_is_not_installed (test_package_permissions.CompletedPackageTests.test_missing_archive_is_not_installed) ... ok
+test_missing_package_install_explains_order_without_build_or_writes (test_package_permissions.CompletedPackageTests.test_missing_package_install_explains_order_without_build_or_writes) ... ok
+test_missing_stage_is_actionable (test_package_permissions.CompletedPackageTests.test_missing_stage_is_actionable) ... ok
+test_paths_cannot_escape_the_publication_directories (test_package_permissions.CompletedPackageTests.test_paths_cannot_escape_the_publication_directories) ... ok
+test_stage_symlink_is_rejected_even_when_it_stays_inside_work (test_package_permissions.CompletedPackageTests.test_stage_symlink_is_rejected_even_when_it_stays_inside_work) ... ok
+test_existing_private_parent_is_not_widened (test_package_permissions.InstallDirectoryPermissionsTests.test_existing_private_parent_is_not_widened) ... ok
+test_new_directories_have_public_traversal_under_restrictive_umasks (test_package_permissions.InstallDirectoryPermissionsTests.test_new_directories_have_public_traversal_under_restrictive_umasks) ... ok
+test_nondirectory_parent_is_rejected (test_package_permissions.InstallDirectoryPermissionsTests.test_nondirectory_parent_is_rejected) ... ok
+test_symlink_parent_is_rejected_without_chmod (test_package_permissions.InstallDirectoryPermissionsTests.test_symlink_parent_is_rejected_without_chmod) ... ok
+test_actual_locked_source_extracted_with_restrictive_umasks (test_package_permissions.SourcePermissionsTests.test_actual_locked_source_extracted_with_restrictive_umasks) ... ok
+test_export_validation_still_requires_exact_runtime_mode (test_package_permissions.SourcePermissionsTests.test_export_validation_still_requires_exact_runtime_mode) ... ok
+test_restricted_source_hash_mismatch_is_still_rejected (test_package_permissions.SourcePermissionsTests.test_restricted_source_hash_mismatch_is_still_rejected) ... ok
+test_restricted_source_symlink_is_still_rejected (test_package_permissions.SourcePermissionsTests.test_restricted_source_symlink_is_still_rejected) ... ok
+test_source_validation_accepts_restricted_readable_assets_without_chmod (test_package_permissions.SourcePermissionsTests.test_source_validation_accepts_restricted_readable_assets_without_chmod) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 1.582s
+
+OK

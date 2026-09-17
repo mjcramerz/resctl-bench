@@ -1,20 +1,21 @@
 diff --git a/rd-agent-intf/src/args.rs b/rd-agent-intf/src/args.rs
-index c3564b8..b495c06 100644
+index c3564b8..08cc00c 100644
 --- a/rd-agent-intf/src/args.rs
 +++ b/rd-agent-intf/src/args.rs
-@@ -19,6 +19,7 @@ lazy_static::lazy_static! {
+@@ -19,6 +19,8 @@ lazy_static::lazy_static! {
               --no-iolat         'Disable bpf-based io latency stat monitoring'
               --force            'Ignore startup check results and proceed'
               --force-running    'Ignore bench requirements and enter Running state'
++             --runtime-contract 'Print the compiled IOCost Lab compatibility contract and exit'
 +             --export-support=[NEW_DIRECTORY] 'Export embedded helper files only; use alone, no privileges or devices needed'
               --prepare          'Prepare the files and directories and exit'
               --linux-tar=[FILE] 'Path to linux source tarball for compile sideload (__SKIP__ to skip)'
               --bench-file=[FILE] 'Bench file name override'
 diff --git a/rd-agent/README.md b/rd-agent/README.md
-index 570981a..2fa9f1c 100644
+index 570981a..27625ca 100644
 --- a/rd-agent/README.md
 +++ b/rd-agent/README.md
-@@ -33,3 +33,29 @@ want to explore the control files.
+@@ -33,3 +33,45 @@ want to explore the control files.
  more information on the containing projects, visit:
  
    https://github.com/facebookexperimental/resctl-demo
@@ -44,14 +45,60 @@ index 570981a..2fa9f1c 100644
 +`misc::support_tests` includes reset/recreation, stale-file, exact-byte and
 +symlink regressions. See the containing build kit's `docs/NATIVE-REPAIR.md` for
 +the source patch, compatibility contract and mandatory packaging checks.
++
++### IOCost Lab native repair contract (v2)
++
++`rd-agent --runtime-contract` prints `resctl-iocost-lab-v2` and exits without
++reading configuration or touching systemd, cgroups, BPF, swap or storage. The
++same exact file-only argument is supported by resctl-bench, rd-hashd and
++resctl-demo. Extra arguments are not interpreted as a successful probe.
++
++This repair also distinguishes disabled per-device I/O-controller rows from
++active limits, refreshes sysinfo memory/process snapshots before checks, and
++avoids a secondary collector-disconnect panic during normal shutdown. Real
++active limits and unexpected collector failures still fail closed. Full runs
++require critical D-Bus services already under hostcritical.slice; after
++reviewing placement overrides, reboot a maintenance host instead of restarting
++D-Bus during an active session. resctl-bench returns an ordinary nonzero error
++for a rejected job rather than deliberately panicking on that error.
 diff --git a/rd-agent/src/main.rs b/rd-agent/src/main.rs
-index 623eb4e..c1733c5 100644
+index 623eb4e..9ed948d 100644
 --- a/rd-agent/src/main.rs
 +++ b/rd-agent/src/main.rs
-@@ -1233,6 +1233,16 @@ fn update_index(cfg: &Config) -> Result<()> {
+@@ -611,13 +611,14 @@ impl Config {
+         }
+ 
+         bail!(
+-            "{} is not in hostcritical.slice, overridden but needs a restart",
++            "{} is not in hostcritical.slice; a drop-in was written. Reboot the maintenance host before retrying (do not restart D-Bus during an active session)",
+             svc_name
+         );
+     }
+ 
+     fn startup_checks(&mut self) -> Result<()> {
+-        let sys = sysinfo::System::new();
++        let mut sys = sysinfo::System::new();
++        sys.refresh_memory();
+ 
+         // Obtain rd-hashd version.
+         let output = Command::new(&self.hashd_paths[0].bin)
+@@ -918,7 +919,8 @@ impl Config {
+ 
+         // Gotta re-read sysinfo to avoid reading cached oomd pid from
+         // before stopping it.
+-        let sys = sysinfo::System::new();
++        let mut sys = sysinfo::System::new();
++        sys.refresh_processes();
+         let procs = sys.processes();
+         for (pid, proc) in procs {
+             let exe = proc
+@@ -1233,6 +1235,19 @@ fn update_index(cfg: &Config) -> Result<()> {
  }
  
  fn main() {
++    if maybe_show_runtime_contract() {
++        return;
++    }
 +    // Export compiled support bytes without initializing a benchmark environment.
 +    // Keep this before Args::init_args_and_logging, which may read/write args.
 +    let export_args: Vec<_> = std::env::args_os().skip(1).collect();
@@ -340,6 +387,244 @@ index ce0f105..5e12199 100755
 +# IOCost Lab: use the checked Debian interpreter and local compatibility helper.
 +# No global Python/BCC/kernel files or vendor binaries are changed.
 +exec /usr/bin/python3 -I -B "$(dirname "$0")/biolatpcts.py" "$@"
+diff --git a/rd-agent/src/report.rs b/rd-agent/src/report.rs
+index cebdfd7..7d95210 100644
+--- a/rd-agent/src/report.rs
++++ b/rd-agent/src/report.rs
+@@ -839,11 +839,15 @@ impl ReportWorker {
+         Ok(iolat_map)
+     }
+ 
+-    fn maybe_retry_iolat(retries: &mut u32, iolat: &mut IoLatReader, e: &dyn std::error::Error) {
+-        if *retries > 0 && !prog_exiting() {
++    fn maybe_retry_iolat(retries: &mut u32, iolat: &mut IoLatReader, e: &dyn std::error::Error) -> bool {
++        if prog_exiting() {
++            return false;
++        }
++        if *retries > 0 {
+             *retries -= 1;
+             warn!("report: iolat reader thread failed ({:?}), retrying...", e);
+             iolat.reset().unwrap();
++            true
+         } else {
+             error!("report: iolat reader thread failed ({:?}), giving up", e);
+             panic!();
+@@ -892,7 +896,11 @@ impl ReportWorker {
+                                 Err(e) => warn!("report: failed to parse iolat output ({:?})", &e),
+                             }
+                         }
+-                        Err(e) => Self::maybe_retry_iolat(&mut iolat_retries, &mut iolat, &e),
++                        Err(e) => {
++                            if !Self::maybe_retry_iolat(&mut iolat_retries, &mut iolat, &e) {
++                                break 'outer;
++                            }
++                        },
+                     }
+                 },
+                 recv(iolat_cum.rx.as_ref().unwrap()) -> res => {
+@@ -903,7 +911,11 @@ impl ReportWorker {
+                                 Err(e) => warn!("report: failed to parse iolat_cum output ({:?})", &e),
+                             }
+                         }
+-                        Err(e) => Self::maybe_retry_iolat(&mut iolat_cum_retries, &mut iolat_cum, &e),
++                        Err(e) => {
++                            if !Self::maybe_retry_iolat(&mut iolat_cum_retries, &mut iolat_cum, &e) {
++                                break 'outer;
++                            }
++                        },
+                     }
+                 },
+                 recv(self.term_rx) -> term => {
+diff --git a/rd-agent/src/slices.rs b/rd-agent/src/slices.rs
+index b575cc8..eccbd43 100644
+--- a/rd-agent/src/slices.rs
++++ b/rd-agent/src/slices.rs
+@@ -17,41 +17,105 @@ use rd_agent_intf::{
+ use rd_util::systemd::UnitState as US;
+ use rd_util::*;
+ 
+-pub fn check_other_io_controllers(sr_failed: &mut MissedSysReqs) {
+-    let mut failed = None;
+-    let mut nr_fails = 0;
++// A reset controller can retain a per-device row. Such a row is disabled,
++// not a competing I/O policy. Unknown nonempty data is conservatively active.
++fn io_controller_active(name: &str, text: &str) -> bool {
++    text.lines().any(|line| {
++        let mut fields = line.split_whitespace();
++        let device = match fields.next() {
++            Some(device) => device,
++            None => return false,
++        };
++        match device.split_once(':') {
++            Some((major, minor)) if !major.is_empty() && !minor.is_empty()
++                && major.bytes().all(|c| c.is_ascii_digit())
++                && minor.bytes().all(|c| c.is_ascii_digit()) => {}
++            _ => return true,
++        }
++        let mut found = false;
++        for field in fields {
++            found = true;
++            let (key, value) = match field.split_once('=') {
++                Some(pair) => pair,
++                None => return true,
++            };
++            let disabled = match name {
++                "io.max" => matches!(key, "rbps" | "wbps" | "riops" | "wiops") && value == "max",
++                "io.latency" => key == "target" && value == "0",
++                "io.low" => matches!(key, "rbps" | "wbps" | "riops" | "wiops") && value == "0",
++                _ => false,
++            };
++            if !disabled {
++                return true;
++            }
++        }
++        !found
++    })
++}
+ 
++pub fn check_other_io_controllers(sr_failed: &mut MissedSysReqs) {
++    let mut conflicts = std::collections::BTreeSet::new();
+     for path in glob("/sys/fs/cgroup/**/io.latency")
+         .unwrap()
+         .chain(glob("/sys/fs/cgroup/**/io.max").unwrap())
+         .chain(glob("/sys/fs/cgroup/**/io.low").unwrap())
+         .filter_map(Result::ok)
+     {
+-        match read_one_line(&path) {
+-            Ok(line) if line.trim().len() == 0 => continue,
+-            Err(_) => continue,
++        let name = path.file_name().unwrap().to_string_lossy();
++        match fs::read_to_string(&path) {
++            Ok(text) if !io_controller_active(&name, &text) => continue,
++            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
++            // Unreadable state cannot establish safe isolation.
+             _ => {}
+         }
+-        if failed.is_none() {
+-            failed = path
+-                .parent()
+-                .and_then(|x| x.file_name())
+-                .and_then(|x| Some(x.to_string_lossy().into_owned()));
++        if let Some(parent) = path.parent() {
++            conflicts.insert(parent.display().to_string());
+         }
+-        nr_fails += 1;
+     }
+-
+-    if let Some(failed) = failed {
++    if !conflicts.is_empty() {
+         sr_failed.add(
+             SysReq::NoOtherIoControllers,
+-            &format!(
+-                "{} cgroups including {:?} have non-empty io.latency/low/max configs: disable",
+-                nr_fails, &failed
+-            ),
++            &format!("{} cgroups have active or unreadable io.latency/low/max policies: {}. Quiesce the owning services before calibration; do not use --force.",
++                     conflicts.len(), conflicts.into_iter().collect::<Vec<_>>().join(", ")),
+         );
+     }
+ }
+ 
++#[cfg(test)]
++mod io_policy_tests {
++    use super::io_controller_active;
++
++    #[test]
++    fn empty_controller_is_disabled() {
++        assert!(!io_controller_active("io.max", "\n  \n"));
++    }
++    #[test]
++    fn unlimited_max_row_is_disabled() {
++        assert!(!io_controller_active("io.max", "259:0 rbps=max wbps=max riops=max wiops=max\n"));
++    }
++    #[test]
++    fn reset_latency_and_low_are_disabled() {
++        assert!(!io_controller_active("io.latency", "259:0 target=0\n"));
++        assert!(!io_controller_active("io.low", "259:0 rbps=0 wbps=0 riops=0 wiops=0\n"));
++    }
++    #[test]
++    fn finite_max_and_positive_latency_are_active() {
++        assert!(io_controller_active("io.max", "259:0 rbps=max wbps=1024\n"));
++        assert!(io_controller_active("io.latency", "259:0 target=1000\n"));
++    }
++    #[test]
++    fn reads_beyond_first_device() {
++        assert!(io_controller_active("io.max", "259:0 rbps=max\n8:0 rbps=1\n"));
++    }
++    #[test]
++    fn malformed_and_unknown_policies_fail_closed() {
++        assert!(io_controller_active("io.max", "259:0 mystery=0\n"));
++        assert!(io_controller_active("io.max", "259:0\n"));
++        assert!(io_controller_active("io.max", "259:0 broken\n"));
++        assert!(io_controller_active("io.max", "bogus rbps=max"));
++    }
++}
++
+ fn mknob_to_cgrp_string(knob: &MemoryKnob, is_limit: bool) -> String {
+     match knob.nr_bytes(is_limit) {
+         std::u64::MAX => "max".to_string(),
+diff --git a/rd-hashd/src/main.rs b/rd-hashd/src/main.rs
+index 9226925..b13b76a 100644
+--- a/rd-hashd/src/main.rs
++++ b/rd-hashd/src/main.rs
+@@ -158,6 +158,9 @@ fn create_logger(args: &Args, params: &Params) -> Option<Logger> {
+ }
+ 
+ fn main() {
++    if maybe_show_runtime_contract() {
++        return;
++    }
+     assert_eq!(*VERSION, *rd_hashd_intf::VERSION);
+     Args::set_help_body(std::str::from_utf8(include_bytes!("../README.md")).unwrap());
+ 
+diff --git a/rd-util/src/lib.rs b/rd-util/src/lib.rs
+index 4d1bb2a..a0ce19a 100644
+--- a/rd-util/src/lib.rs
++++ b/rd-util/src/lib.rs
+@@ -41,6 +41,43 @@ pub use json_file::{
+ pub use storage_info::*;
+ pub use systemd::TransientService;
+ 
++/// File-only compatibility probe, shared by every binary in this native family.
++/// Keep independent of configuration, logging, systemd and workload initialization.
++pub const IOCOST_LAB_CONTRACT: &str = "resctl-iocost-lab-v2";
++
++fn is_runtime_contract_request(args: &[OsString]) -> bool {
++    args.len() == 1 && args[0] == OsStr::new("--runtime-contract")
++}
++
++pub fn maybe_show_runtime_contract() -> bool {
++    if !is_runtime_contract_request(&env::args_os().skip(1).collect::<Vec<_>>()) {
++        return false;
++    }
++    println!("{}", IOCOST_LAB_CONTRACT);
++    true
++}
++
++#[cfg(test)]
++mod runtime_contract_tests {
++    use super::*;
++
++    #[test]
++    fn exact_file_only_probe() {
++        assert!(is_runtime_contract_request(&[OsString::from("--runtime-contract")]));
++    }
++    #[test]
++    fn normal_startup_is_not_a_probe() {
++        assert!(!is_runtime_contract_request(&[]));
++        assert!(!is_runtime_contract_request(&[OsString::from("--help")]));
++    }
++    #[test]
++    fn mixed_arguments_cannot_hide_workloads() {
++        assert!(!is_runtime_contract_request(&[
++            OsString::from("--runtime-contract"), OsString::from("--prepare"),
++        ]));
++    }
++}
++
+ pub const TO_MSEC: f64 = 1000.0;
+ pub const TO_PCT: f64 = 100.0;
+ pub const MSEC: f64 = 1.0 / 1000.0;
 diff --git a/rd-util/src/storage_info.rs b/rd-util/src/storage_info.rs
 index c9801e5..928b6ac 100644
 --- a/rd-util/src/storage_info.rs
@@ -506,3 +791,93 @@ index c9801e5..928b6ac 100644
 +        assert!(findmnt_source(br#"{"filesystems":[{"source":"/dev/bad\u0000name"}]}"#).is_err());
 +    }
 +}
+diff --git a/resctl-bench/src/main.rs b/resctl-bench/src/main.rs
+index 4264ff9..896dfcd 100644
+--- a/resctl-bench/src/main.rs
++++ b/resctl-bench/src/main.rs
+@@ -128,7 +128,7 @@ impl Program {
+         }
+     }
+ 
+-    fn do_run(&mut self) {
++    fn do_run(&mut self) -> Result<()> {
+         verify_agent_and_hashd(&FULL_VERSION);
+         let mut base = match self.args_file.data.mode {
+             Mode::Study | Mode::Solve => base::Base::dummy(&self.args_file.data),
+@@ -180,10 +180,10 @@ impl Program {
+             let mut rctx = RunCtx::new(&args, &mut base, self.jobs.clone());
+             let name = format!("{}", &jctx.data.spec);
+             if let Err(e) = rctx.run_jctx(jctx) {
+-                error!("{}: {:?}", &name, &e);
+-                panic!();
++                return Err(e.context(format!("{}: benchmark stopped; no completed calibration is claimed", name)));
+             }
+         }
++        Ok(())
+     }
+ 
+     fn do_format(&mut self, opts: &FormatOpts) {
+@@ -468,7 +468,7 @@ impl Program {
+         Ok(())
+     }
+ 
+-    fn main(mut self) {
++    fn main(mut self) -> Result<()> {
+         let args = &self.args_file.data;
+ 
+         // Load existing result file into job_ctxs.
+@@ -492,7 +492,7 @@ impl Program {
+         let rstat = args.rstat;
+         let result_path = args.result.clone();
+         match args.mode {
+-            Mode::Run | Mode::Study | Mode::Solve => self.do_run(),
++            Mode::Run | Mode::Study | Mode::Solve => self.do_run()?,
+             Mode::Format => self.do_format(&FormatOpts {
+                 full: true,
+                 undecorated: false,
+@@ -529,10 +529,14 @@ impl Program {
+                 }
+             }
+         }
++        Ok(())
+     }
+ }
+ 
+ fn main() {
++    if maybe_show_runtime_contract() {
++        return;
++    }
+     assert_eq!(*VERSION, *resctl_bench_intf::VERSION);
+ 
+     #[cfg(feature = "lambda")]
+@@ -554,10 +558,15 @@ fn main() {
+ 
+     systemd::set_systemd_timeout(args_file.data.systemd_timeout);
+ 
+-    Program {
++    let result = Program {
+         args_file,
+         args_updated,
+         jobs: Arc::new(Mutex::new(JobCtxs::default())),
+     }
+     .main();
++    if let Err(error) = result {
++        error!("{:#}", error);
++        // All benchmark contexts and cleanup guards were dropped above.
++        exit(1);
++    }
+ }
+diff --git a/resctl-demo/src/main.rs b/resctl-demo/src/main.rs
+index 69b7f7b..e1d9fdf 100644
+--- a/resctl-demo/src/main.rs
++++ b/resctl-demo/src/main.rs
+@@ -490,6 +490,9 @@ fn touch_units() {
+ }
+ 
+ fn main() {
++    if maybe_show_runtime_contract() {
++        return;
++    }
+     #[allow(dangerous_implicit_autorefs)]
+     let matches = clap::App::new("resctl-demo")
+         .version((*FULL_VERSION).as_str())

@@ -14,11 +14,9 @@
     "resctl-bench/src/main.rs",
     "resctl-demo/src/main.rs"
   ],
-  "details": "pair-preservation.json",
-  "kit_version": "2.3.3",
+  "kit_version": "2.3.2",
   "missing_base_files": [],
   "native_compilation_performed": false,
-  "native_source_unchanged_since_2_3_2": true,
   "original_cargo_lock_retained": true,
   "runtime_contract": "resctl-iocost-lab-v2",
   "schema": 1,

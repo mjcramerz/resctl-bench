@@ -49,7 +49,7 @@ def runtime_path(explicit: Path | None) -> Path:
 
 
 def prepare_arguments(lab: Path, runtime: Path, action: str, *,
-                      runtime_option: str = '--runtime-dir') -> list[str]:
+                      runtime_option: str = '--runtime-dir', quiesce_zram_writeback: bool = False) -> list[str]:
     if not (lab / 'iocost_report.py').is_file() or not (lab / 'RUN.sh').is_file():
         raise RuntimeError('--lab must identify the existing IOCost Lab directory containing RUN.sh')
     if action not in ('full', 'install', 'preflight'):
@@ -62,6 +62,10 @@ def prepare_arguments(lab: Path, runtime: Path, action: str, *,
         args += ['--install-deps']
     if action == 'install':
         args += ['--install']
+    if quiesce_zram_writeback:
+        if runtime_option != '--bin-dir':
+            raise RuntimeError('Writeback preparation requires IOCost Lab 2.1 or later')
+        args += ['--quiesce-zram-writeback']
     return args
 
 
@@ -87,7 +91,9 @@ def installed_bin_dir(runtime: Path) -> Path:
     installation cannot be mistaken for the new build. The Lab performs its
     own additional ownership, permissions and companion-resolution checks.
     """
-    command = shutil.which('resctl-bench')
+    entries = [p for p in os.environ.get('PATH', os.defpath).split(os.pathsep) if p and Path(p).is_absolute()]
+    entries += [p for p in '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'.split(':') if p not in entries]
+    command = shutil.which('resctl-bench', path=os.pathsep.join(entries))
     if not command:
         raise RuntimeError('IOCost Lab 2.x uses installed commands. After building, run '
                            'sudo ./BUILD.sh install; then run the Lab again.')
@@ -114,6 +120,7 @@ def main() -> int:
     parser.add_argument('--lab', type=Path, required=True, help='Existing IOCost Lab 1.5.x or 2.x code directory (not a scratch path)')
     parser.add_argument('--runtime-dir', type=Path, help='Optional relocated runtime package; default is this build\'s last successful stage')
     parser.add_argument('--action', choices=('full', 'install', 'preflight'))
+    parser.add_argument('--quiesce-zram-writeback', action='store_true', help='Pass an explicit temporary writeback-service plan to IOCost Lab 2.1+')
     parser.add_argument('--plan', action='store_true', help='Verify the package and print the command; do not launch the Lab')
     args = parser.parse_args()
     try:
@@ -140,7 +147,8 @@ def main() -> int:
         lab = args.lab.expanduser().resolve(strict=True)
         runtime_option = detect_lab_interface(lab)
         selected = installed_bin_dir(runtime) if runtime_option == '--bin-dir' else runtime
-        command = prepare_arguments(lab, selected, action, runtime_option=runtime_option)
+        command = prepare_arguments(lab, selected, action, runtime_option=runtime_option,
+                                    quiesce_zram_writeback=args.quiesce_zram_writeback)
         print('Rebuilt native runtime: ' + str(runtime), flush=True)
         print('Invocation/output directory: ' + os.getcwd(), flush=True)
         if args.plan:

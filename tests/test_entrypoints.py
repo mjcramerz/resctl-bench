@@ -97,6 +97,17 @@ class EntrypointTests(unittest.TestCase):
                 self.assertIn("disabled", result.stderr)
                 self.assertNotIn("Traceback", result.stderr)
 
+    def test_install_and_verify_before_package_explain_missing_success(self):
+        for action in ("install", "verify"):
+            with self.subTest(action=action):
+                result = self.run_command(["make", "--no-print-directory", action])
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("No successfully completed package", result.stderr)
+                self.assertIn("make package verify as your ordinary user", result.stderr)
+                self.assertNotIn("No such file or directory", result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertFalse((self.root / ".work/last-package.json").exists())
+
     def test_make_package_uses_one_driver_process(self):
         result = self.run_command(["make", "--no-print-directory", "--dry-run", "package"])
         self.assert_success(result)

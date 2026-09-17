@@ -26,11 +26,19 @@ jobs:
         shell: bash
         run: |
           make snapshot-dist
-          mkdir /tmp/kit-release-check
-          tar -xzf dist/resctl-bench-2.2.6-complete-source-2.3.1.tar.gz -C /tmp/kit-release-check
-          cd /tmp/kit-release-check/resctl-bench
-          sha256sum -c SHA256SUMS
-          PYTHONSAFEPATH=1 make help fetch verify-source lint test
+          archive="$PWD/dist/resctl-bench-2.2.6-complete-source-2.3.3.tar.gz"
+          for mask in 022 027 077; do
+            target="/tmp/kit-release-check-$mask"
+            mkdir "$target"
+            (
+              umask "$mask"
+              # CI runs as root; explicitly use ordinary-user extraction policy.
+              tar --no-same-permissions -xzf "$archive" -C "$target"
+              cd "$target/resctl-bench"
+              sha256sum -c SHA256SUMS
+              PYTHONSAFEPATH=1 make help fetch verify-source lint test
+            )
+          done
   real-upstream:
     if: github.event_name == 'workflow_dispatch' && inputs.upstream_build
     # Administrators provide this runner with Rust and Debian dependencies.
@@ -42,7 +50,7 @@ jobs:
           persist-credentials: false
       - name: Verify the preinstalled host tools
         run: make doctor TOOLCHAIN=host TUNE=portable
-      - run: make package verify source-dist TOOLCHAIN=host TUNE=portable
+      - run: make native-validate source-dist TOOLCHAIN=host TUNE=portable
       - name: Relocate the populated source distribution and compile offline
         shell: bash
         run: |

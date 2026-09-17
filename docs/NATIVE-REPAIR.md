@@ -1,3 +1,6 @@
+> Historical repair background retained from the supplied source. For the
+> current uploaded failures and this revision, read DELIVERY-REPAIR.md.
+
 # Native runtime repair: evidence and implementation
 
 ## Evidence supplied for this repair

@@ -91,6 +91,9 @@ class ExportContractTests(unittest.TestCase):
         self.contract = support.read_contract(ROOT / 'compat/runtime-contract.json')
         self.directory = self.base / 'helpers'
         shutil.copytree(ROOT / 'upstream/rd-agent/src/misc', self.directory)
+        # Model an agent EXPORT, which fchmods 0755 regardless of source/umask.
+        for name in support.FILES:
+            (self.directory / name).chmod(0o755)
 
     def test_good_hashes(self):
         self.assertEqual(support.verify_files(self.directory, self.contract), self.contract['files'])
@@ -145,7 +148,12 @@ class ExportContractTests(unittest.TestCase):
     def fake_agent(self, body):
         binary = self.base / 'bin/rd-agent'
         binary.parent.mkdir(exist_ok=True)
-        binary.write_text('#!/bin/sh\n' + body + '\n')
+        header = '#!/bin/sh\nif [ "$#" = 1 ] && [ "$1" = --runtime-contract ]; then echo resctl-iocost-lab-v2; exit 0; fi\n'
+        binary.write_text(header + body + '\n')
+        for name in ('resctl-bench', 'rd-hashd'):
+            peer = binary.parent / name
+            peer.write_text(header + 'exit 99\n')
+            peer.chmod(0o755)
         binary.chmod(0o755)
         return binary.parent
 
@@ -176,6 +184,26 @@ class ExportContractTests(unittest.TestCase):
         for value in ('../../x', '/tmp/nvme0n1', 'x;echo', 'x\ny'):
             with self.subTest(value=value), self.assertRaises(support.SupportError):
                 support.device_number(value)
+
+
+    def test_wrong_native_contract_rejected(self):
+        binary = self.fake_agent('exit 0')
+        peer = binary / 'rd-hashd'
+        peer.write_text('#!/bin/sh\necho old-native-code\n'); peer.chmod(0o755)
+        with self.assertRaisesRegex(support.SupportError, 'rd-hashd is old/unpatched'):
+            support.run_export(binary, self.contract)
+
+    def test_missing_companion_rejected_before_export(self):
+        binary = self.fake_agent('exit 0')
+        (binary / 'rd-hashd').unlink()
+        with self.assertRaisesRegex(support.SupportError, 'Missing compiled native companion'):
+            support.run_export(binary, self.contract)
+
+    def test_unknown_native_contract_schema_rejected(self):
+        path = self.base / 'bad-native.json'
+        path.write_text(json.dumps({**self.contract, 'native_contract':'unreviewed'}))
+        with self.assertRaisesRegex(support.SupportError, 'Unrecognized compiled native'):
+            support.read_contract(path)
 
 
 class CollectorPythonTests(unittest.TestCase):

@@ -215,7 +215,7 @@ class OfflineRecoveryTests(unittest.TestCase):
 
     def test_kit_dist_is_complete_for_this_patchset(self):
         result = execute([self.root / 'BUILD.sh', 'kit-dist'], self.base)
-        path = self.root / 'dist/resctl-bench-2.2.6-complete-source-2.3.1.tar.gz'
+        path = self.root / f'dist/resctl-bench-2.2.6-complete-source-{bk.VERSION}.tar.gz'
         self.assertTrue(path.is_file(), result.stdout + result.stderr)
         with tarfile.open(path) as stream:
             names = set(stream.getnames())
@@ -230,7 +230,7 @@ class OfflineRecoveryTests(unittest.TestCase):
         # A source release must use the SAME index as its pinned recovery asset.
         execute(['git', 'update-index', '--refresh'], self.source, success=False)
         execute([self.root / 'BUILD.sh', 'snapshot-dist'], self.base)
-        archive = self.root / 'dist/resctl-bench-2.2.6-complete-source-2.3.1.tar.gz'
+        archive = self.root / f'dist/resctl-bench-2.2.6-complete-source-{bk.VERSION}.tar.gz'
         unpacked = self.base / 'fresh release'
         unpacked.mkdir()
         execute(['tar', '-xzf', archive, '-C', unpacked], self.base)

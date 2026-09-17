@@ -48,12 +48,23 @@ def read_contract(path: Path) -> dict[str, Any]:
             or not isinstance(data.get('bpf_measurement_program_sha256'), str)
             or not re.fullmatch(r'[0-9a-f]{64}', data['bpf_measurement_program_sha256'])):
         raise SupportError('Invalid runtime compatibility contract: ' + str(path))
+    if 'native_contract' in data and data['native_contract'] != 'resctl-iocost-lab-v2':
+        raise SupportError('Unrecognized compiled native repair contract')
     if not all(isinstance(v, str) and re.fullmatch(r'[0-9a-f]{64}', v) for v in data['files'].values()):
         raise SupportError('Invalid helper hash in runtime contract')
     return data
 
 
-def verify_files(directory: Path, contract: Mapping[str, Any], *, exact: bool = True) -> dict[str, str]:
+def verify_files(directory: Path, contract: Mapping[str, Any], *, exact: bool = True,
+                 required_mode: int | None = 0o755) -> dict[str, str]:
+    """Check reviewed bytes and regular files; exported helpers default to 0755.
+
+    Source assets are read by include_bytes!, not executed by the compiler.
+    validate_source therefore disables ONLY this runtime mode check. Source
+    hashes, Git executable-bit identity, the source lock and path checks remain
+    independently enforced by the builder. Never chmod the user's source tree
+    just to undo a restrictive extraction umask.
+    """
     if not directory.is_dir() or directory.is_symlink():
         raise SupportError('Agent did not export a real helper directory: ' + str(directory))
     if exact and {p.name for p in directory.iterdir()} != set(FILES):
@@ -63,8 +74,10 @@ def verify_files(directory: Path, contract: Mapping[str, Any], *, exact: bool = 
         path = directory / name
         if not path.is_file() or path.is_symlink():
             raise SupportError('Missing/nonregular support file: ' + name)
-        if path.stat().st_mode & 0o7777 != 0o755:
-            raise SupportError('Support file does not have the required executable mode: ' + name)
+        mode = path.stat().st_mode & 0o7777
+        if required_mode is not None and mode != required_mode:
+            raise SupportError('Support file does not have the required executable mode: '
+                               + name + f' (expected {required_mode:04o}, found {mode:04o}: {path})')
         actual = sha256(path)
         if actual != contract['files'][name]:
             raise SupportError('Embedded helper differs from reviewed source: ' + name)
@@ -75,7 +88,7 @@ def verify_files(directory: Path, contract: Mapping[str, Any], *, exact: bool = 
 def validate_source(source: Path, contract_path: Path) -> dict[str, Any]:
     contract = read_contract(contract_path)
     directory = source / 'rd-agent/src/misc'
-    verify_files(directory, contract)
+    verify_files(directory, contract, required_mode=None)
     text = (directory / 'biolatpcts.py').read_text()
     tree = ast.parse(text)
     initializers = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
@@ -106,6 +119,24 @@ def run_export(binary_dir: Path, contract: Mapping[str, Any], *,
         target = base / 'helpers'
         env.update(HOME=temp, TMPDIR=temp, LC_ALL='C', PYTHONNOUSERSITE='1')
         before = sha256(agent)
+        markers = {}
+        if contract.get('native_contract'):
+            for name in ('resctl-bench', 'rd-agent', 'rd-hashd'):
+                binary = binary_dir.resolve() / name
+                if not binary.is_file() or binary.is_symlink() or not os.access(binary, os.X_OK):
+                    raise SupportError('Missing compiled native companion: ' + str(binary))
+                identity = sha256(binary)
+                try:
+                    probe = subprocess.run([str(binary), '--runtime-contract'], cwd=base, env=env,
+                                           capture_output=True, text=True, timeout=20, check=False)
+                except (OSError, subprocess.TimeoutExpired) as exc:
+                    raise SupportError('Native repair contract probe failed: ' + name + ': ' + str(exc)) from exc
+                if probe.returncode or probe.stdout.strip() != contract['native_contract']:
+                    raise SupportError(name + ' is old/unpatched or incompatible: --runtime-contract did not return ' +
+                                       contract['native_contract'] + '; rebuild and install all three companions. ' + probe.stderr[-2000:])
+                if sha256(binary) != identity:
+                    raise SupportError('Native companion changed during contract verification: ' + name)
+                markers[name] = {'contract': probe.stdout.strip(), 'sha256': identity}
         try:
             proc = subprocess.run([str(agent), '--export-support', str(target)],
                                   cwd=base, env=env, capture_output=True, text=True,
@@ -121,7 +152,7 @@ def run_export(binary_dir: Path, contract: Mapping[str, Any], *,
             raise SupportError('Agent changed during compiled-helper verification')
     return {'schema': 1, 'verified': True, 'kind': 'compiled-embedded-helper-export',
             'bpf_attached': False, 'storage_workload_run': False,
-            'compatibility_id': contract['id'], 'agent_sha256': before,
+            'compatibility_id': contract['id'], 'native_contracts': markers, 'agent_sha256': before,
             'helper_sha256': hashes, 'stdout': proc.stdout, 'stderr': proc.stderr}
 
 

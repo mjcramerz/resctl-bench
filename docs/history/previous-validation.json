@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "release": "2.3.1",
+  "native_version": "2.2.6",
+  "verified_at_utc": "2026-09-16T22:18:29.551553+00:00",
+  "source_commit": "bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b",
+  "all_163_repaired_source_files_unchanged_from_2_3_0": true,
+  "source_recovery": "actual Git, filesystem, archive and Make operations; no source-network access",
+  "python_and_build_system_tests": {
+    "tests_run": 204,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "success": true,
+    "seconds": 125.4384253025055,
+    "rust_compiled": false,
+    "real_git_recovery_tests": true,
+    "details": []
+  },
+  "new_source_recovery_tests": 32,
+  "new_lab_interface_tests": 10,
+  "actual_lab_2_0_help_probe": {
+    "lab": "2.0.0",
+    "probe": "run --help only",
+    "detected_option": "--bin-dir",
+    "benchmark_executed": false
+  },
+  "python_syntax_files": 23,
+  "shell_syntax_checked": [
+    "BUILD.sh",
+    "RUN-IOCOST-LAB.sh",
+    "upstream/rd-agent/src/misc/biolatpcts_wrapper.sh"
+  ],
+  "compiled_rust_workspace": false,
+  "native_rust_tests_executed": false,
+  "pipeline_compiler_fixtures": "explicitly synthetic Rust/Cargo with real Git, C ELF and package verification",
+  "real_bpf_attachment": false,
+  "hardware_benchmark": false,
+  "installed_or_changed_host_swap": false,
+  "runtime_binaries_in_source_release": false,
+  "vendored_third_party_crates": false,
+  "toolchain_availability": {
+    "rustc": null,
+    "cargo": null,
+    "rustdoc": null
+  }
+}

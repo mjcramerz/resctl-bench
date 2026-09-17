@@ -1,0 +1,32 @@
+{
+  "full_software_suite": {
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "tests": 216
+  },
+  "native_build_attempt": {
+    "command": "ALLOW_ROOT_BUILD=1 ALLOW_UNSUPPORTED_DEBIAN=1 ./BUILD.sh check",
+    "compiler_invoked": false,
+    "exit_status": 2,
+    "reason": "Host rustc not found"
+  },
+  "notes": [
+    "Build-pipeline C/Cargo/BCC fixtures are synthetic, not compiled resctl or live hardware.",
+    "Previous-release records are clearly separated under docs/history/."
+  ],
+  "release": "2.3.2",
+  "runtime_contract": "resctl-iocost-lab-v2",
+  "schema": 1,
+  "scope": {
+    "actual_rust_compilation": false,
+    "actual_rust_tests": false,
+    "cargo_dependencies_vendored": false,
+    "live_bpf": false,
+    "live_systemd_service_changes": false,
+    "physical_calibration": false,
+    "real_measured_hwdb_deployment": false,
+    "real_swap_changes": false
+  },
+  "validation_date": "2026-09-16"
+}

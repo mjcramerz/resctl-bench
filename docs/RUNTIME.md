@@ -2,11 +2,14 @@
 
 ## Select the rebuilt runtime, not the old vendor archive
 
-After `make package verify`, use the source root's `RUN-IOCOST-LAB.sh --lab
-/absolute/path/to/iocost-lab`. It verifies the package and actual embedded helpers
-and passes --runtime-dir explicitly. The existing Lab 1.5.0 handles the full
-benchmark and reports. The bridge does not rewrite the Lab, replace its archive,
-autoformat media, or grant maintenance permissions silently.
+After `make native-validate`, install all three binaries with
+`sudo ./BUILD.sh install` and use IOCost Lab 2.1's own RUN.sh. The optional
+`RUN-IOCOST-LAB.sh --lab /absolute/path/to/iocost-lab` bridge verifies the package
+and installed bytes and passes --bin-dir to the installed-runtime Lab. It
+retains --runtime-dir only for the legacy Lab 1.5 interface. No benchmark,
+filesystem trim, service stop or swap migration is implicitly approved.
+Read DELIVERY-REPAIR.md for D-Bus preparation and the explicit
+--quiesce-zram-writeback option required by the supplied host's active policy.
 
 The build tree can be on any suitable filesystem. The **invocation directory
 for the Lab** must be on the selected calibration disk because the Lab puts
@@ -30,7 +33,7 @@ structured diagnostics, and fails on real compiler/attach errors. It does not
 run fio, touch swap, run the ordinary agent lifecycle or fabricate observations.
 
 Normal benchmarking retains the real agent's BPF initialization. The build
-checks never substitute --no-iolat or a fake collector. The supplied header
+checks never substitute --no-iolat or a fake collector. The earlier reported header
 failure is corrected with C language flags, not by removing kernel assertions.
 
 ## Host prerequisites remain real requirements

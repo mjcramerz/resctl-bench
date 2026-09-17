@@ -1,4 +1,9 @@
-# resctl-bench complete source release - build kit 2.3.1
+# resctl-bench complete source release - build kit 2.3.3
+
+**Packaging follow-up:** the reported `biolatpcts.py` mode failure and missing
+install manifest are addressed in **docs/PACKAGING-REPAIR.md**. Extract this
+release into a new directory. Run `make package verify` successfully in the
+resctl-bench source tree before running its privileged install command.
 
 This is the complete supplied resctl workspace, with a reviewed **native source
 repair**, not another IOCost Lab wrapper or a substitute benchmark. The upstream
@@ -7,7 +12,16 @@ package version remains 2.2.6. The base commit is
 in `patches/` and `source.lock.json` and the native version retains its honest
 `-dirty` suffix.
 
-## Fix for "Patched source tree is missing"
+## Retained repair for the original PATH / host-requirement / panic failures
+
+Read **docs/DELIVERY-REPAIR.md** for the matched IOCost Lab 2.1.1 procedure.
+The previous repair added the native v2 contract, correct disabled-policy detection,
+fresh sysinfo snapshots and orderly ordinary-job/shutdown failure handling.
+The original output.zip showed a host-requirement rejection, not a Cargo
+compiler diagnostic. The new package-mode error is covered above. Actual native compilation remains unverified here because
+the delivery container has no Rust toolchain; the attempt is recorded.
+
+## Source recovery retained from 2.3.1
 
 The previous build driver rejected a missing `upstream/` directory instead of
 restoring the reviewed source. That was a build-system defect, not a Rust
@@ -27,9 +41,9 @@ source, scripts, config.mk and build output stay anchored to this repository.
 See **docs/SOURCE-RECOVERY.md** for recovery behavior, retained backups, integrity
 checks and the distinction between bundled source and third-party Cargo crates.
 
-## Native repairs retained unchanged
+## Earlier native repairs retained
 
-The supplied output records a successful patched latency probe, then
+The earlier 2.3.0 repair addressed a successful patched latency probe followed by
 `resctl-bench` starts `rd-agent --reset`. Reset deletes `work/misc-bin/` and the
 old binary regenerates the original, incompatible BCC helper. Its compiler then
 fails the `sizeof(struct filename) % 64 == 0` assertion. A wrapper-only file
@@ -41,7 +55,7 @@ executable's embedded bytes. Reset and ordinary restarts therefore use the same
 reviewed source. The BPF measurement program, coefficient generator, benchmark
 jobs and result schema are unchanged.
 
-The archive also exposed native Btrfs device-lookup warnings. The old native
+That earlier archive also exposed native Btrfs device-lookup warnings. The old native
 lookup tried to stat display strings such as `/dev/nvme0n1p6[/@]`. It now requests
 structured findmnt JSON with `--nofsroot --target` and validates the resolved
 block device. This applies to both the workload filesystem and swapfiles.
@@ -57,8 +71,7 @@ From the extracted source directory:
 ```sh
 sha256sum -c SHA256SUMS
 ./BUILD.sh fetch verify-source
-./BUILD.sh doctor
-./BUILD.sh package verify
+./BUILD.sh native-validate
 ```
 
 Do **not** run compilation with sudo. The default is the installed host Rust,
@@ -67,8 +80,8 @@ Do **not** run compilation with sudo. The default is the installed host Rust,
 compatible CPUs; that does not remove shared-library requirements.
 
 `make doctor` compiles small Rust/C/C++ probes and checks the actual selected
-host tools. `make package` compiles locked source, runs the 18 new file-only and
-JSON-parsing Rust regressions, exports the compiled embedded helpers and verifies
+host tools. `make package` compiles locked source, runs the 27 selected file-only,
+JSON-parsing, I/O-policy and contract-parser Rust regressions, exports the compiled embedded helpers and verifies
 them byte-for-byte before and after stripping, runs CLI smoke checks, and only
 then publishes the runtime archive. Build tests do not run storage workloads,
 change swap, invoke normal rd-agent startup, or attach BPF.
@@ -173,16 +186,16 @@ maintenance operation with filesystem trim and potential data-loss risks.
 
 ## Source completeness and validation
 
-All 163 upstream working-tree files are present, both directly and in the offline recovery archive. The ZIP's missing 160 files
-were recovered from its own Git objects and checked against its original
-manifest before applying the repair. Original notices and licenses are retained.
+All 163 upstream working-tree files are present, both directly and in the offline recovery archive. The preserved base manifest and real Git objects anchor the reviewed local
+delta. The current tarball is usable directly without reconstructing a missing
+workspace. Original notices and licenses are retained.
 Only the reviewed files recorded in the patch differ from the base. No uploaded
 host logs, private user Git configuration, old binaries or build caches ship.
 
 `make lint test` runs the Python/source/packaging suite, including real Git,
 Make, C ELF, findmnt and Clang fixtures. Synthetic Cargo/BCC fixtures are clearly
 labelled and are not native Rust or live BPF tests. `make test-runtime` uses
-**real Cargo** on a build host to compile and execute the 18 selected Rust tests.
+**real Cargo** on a build host to compile and execute the 27 selected Rust tests.
 
 The delivery environment had no Rust/Cargo and could not fetch a toolchain;
 **this modified Rust workspace was not compiled here**. No live kernel BPF test,

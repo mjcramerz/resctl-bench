@@ -1,4 +1,4 @@
-# Source recovery repair - build kit 2.3.1
+# Source recovery repair - build kit 2.3.2
 
 ## The reported failure
 
@@ -73,10 +73,12 @@ Cargo/cache/network required to obtain those dependencies.
 
 ## What is not changed
 
-The 163 Rust/project source files, Cargo.lock and native repair patch are
-byte-for-byte identical to the reviewed 2.3.0 repaired source. The fixes for BCC
-compiler flags, reset-safe embedded support files and native Btrfs source lookup
-are retained. The package version is still 2.2.6; 2.3.1 versions the build kit.
+This revision retains all 163 project files, the original Cargo.lock, real base
+Git identity and offline recovery design. The local patch now also contains
+the native v2 contract, accurate disabled-policy checks, fresh sysinfo snapshots
+and normal job/shutdown error handling documented in DELIVERY-REPAIR.md.
+The earlier BCC and Btrfs lookup corrections remain intact. Native package
+version 2.2.6 is retained; 2.3.2 versions this source/build kit.
 No tracing bypass, fabricated benchmark result or unpatched executable is added.
 
 All third-party crates are not vendored in this delivery. Offline recovery of

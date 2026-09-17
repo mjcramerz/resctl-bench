@@ -92,9 +92,39 @@ def verify(package: Path) -> dict[str, str]:
     return records
 
 
+def ensure_directory(path: Path) -> None:
+    """Set 0755 on newly created install directories, not existing ancestors.
+
+    mkdir's mode is filtered by umask. Without an explicit chmod a root install
+    under umask 077 can leave a new bin/ inaccessible to ordinary users. Do not
+    change the caller's global umask or widen an existing private DESTDIR.
+    """
+    no_symlinks(path)
+    missing = []
+    current = path
+    while not current.exists():
+        missing.append(current)
+        current = current.parent
+    if not current.is_dir():
+        raise InstallError(f"Installation parent is not a directory: {current}")
+    for directory in reversed(missing):
+        try:
+            directory.mkdir(mode=0o755)
+        except FileExistsError:
+            no_symlinks(directory)
+            if not directory.is_dir():
+                raise InstallError(f"Installation parent is not a directory: {directory}")
+            continue  # Another creator owns its choice of directory permissions.
+        fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            os.fchmod(fd, 0o755)
+        finally:
+            os.close(fd)
+
+
 def atomic_copy(source: Path, destination: Path, mode: int) -> None:
     no_symlinks(destination)
-    destination.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
+    ensure_directory(destination.parent)
     fd, name = tempfile.mkstemp(prefix=".resctl-install-", dir=destination.parent)
     try:
         with os.fdopen(fd, "wb") as target, source.open("rb") as src:
@@ -201,7 +231,7 @@ def main() -> int:
     no_symlinks(prefix)
     lock = prefix / "share/resctl-bench/.buildkit-install.lock"
     no_symlinks(lock)
-    lock.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
+    ensure_directory(lock.parent)
     fd = os.open(lock, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o644)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX)

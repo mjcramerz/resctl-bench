@@ -1,0 +1,19 @@
+{
+  "actual_rust_compilation": false,
+  "comparison": "2.3.3 against delivered 2.3.2 source archive",
+  "lab_fixture_bytes_match_native_source": true,
+  "lab_helper_hashes_match_buildkit": true,
+  "native_contract": "resctl-iocost-lab-v2",
+  "native_files": 163,
+  "native_files_byte_identical": true,
+  "retained_assets_byte_identical": {
+    "compat/runtime-contract.json": true,
+    "patches/0001-embedded-runtime-compat.patch": true,
+    "patches/base-source-manifest.json": true,
+    "source-cache/upstream.tar.gz": true,
+    "source-manifest.json": true,
+    "source.lock.json": true,
+    "upstream/Cargo.lock": true
+  },
+  "schema": 1
+}
