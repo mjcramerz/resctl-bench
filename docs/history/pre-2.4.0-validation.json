@@ -1,0 +1,62 @@
+{
+  "fresh_extraction_restrictive_umask_suite": {
+    "errors": 0,
+    "failures": 0,
+    "fresh_archive_extraction": true,
+    "run_as": "ordinary user",
+    "seconds": 173.48,
+    "skipped": 0,
+    "tests": 238,
+    "umask": "077"
+  },
+  "full_software_suite": {
+    "errors": 0,
+    "failures": 0,
+    "fresh_archive_extraction": false,
+    "run_as": "root",
+    "seconds": 173.285,
+    "skipped": 0,
+    "tests": 238,
+    "umask": "022"
+  },
+  "mode_regression": {
+    "compiled_export_0755_requirement_retained": true,
+    "details": "mode-reproduction.json",
+    "extraction_umasks": [
+      "022",
+      "027",
+      "077"
+    ],
+    "ordinary_user_uid": 1000,
+    "original_2_3_2_error_reproduced": true,
+    "source_mode_not_changed": true
+  },
+  "native_build_attempt": {
+    "command": "ALLOW_UNSUPPORTED_DEBIAN=1 ./BUILD.sh native-validate",
+    "compiler_invoked": false,
+    "details": "native-check-attempt.txt",
+    "exit_status": 2,
+    "reason": "Host rustc not found",
+    "run_as": "ordinary user"
+  },
+  "notes": [
+    "C ELF/Cargo/BCC pipeline fixtures are synthetic, not compiled resctl or live hardware.",
+    "All 163 native source files and locked/recovery assets are retained from 2.3.2.",
+    "Root and ordinary-user test logs are from this revision; prior-release records are under history/.",
+    "The CI workflow was updated but was not executed here."
+  ],
+  "release": "2.3.3",
+  "runtime_contract": "resctl-iocost-lab-v2",
+  "schema": 1,
+  "scope": {
+    "actual_rust_compilation": false,
+    "actual_rust_tests": false,
+    "cargo_dependencies_vendored": false,
+    "live_bpf": false,
+    "live_systemd_service_changes": false,
+    "physical_calibration": false,
+    "real_measured_hwdb_deployment": false,
+    "real_swap_changes": false
+  },
+  "validation_date": "2026-09-17"
+}

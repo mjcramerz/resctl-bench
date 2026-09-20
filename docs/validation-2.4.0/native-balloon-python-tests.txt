@@ -1,0 +1,28 @@
+test_allocation_failure_never_retries (test_native_balloon.AllocationTests.test_allocation_failure_never_retries) ... ok
+test_bad_integer_and_overflow_rejected (test_native_balloon.AllocationTests.test_bad_integer_and_overflow_rejected) ... ok
+test_invalid_page_size_rejected (test_native_balloon.AllocationTests.test_invalid_page_size_rejected) ... ok
+test_low_headroom_times_out_not_partial_success (test_native_balloon.AllocationTests.test_low_headroom_times_out_not_partial_success) ... ok
+test_multiple_chunks_all_faulted (test_native_balloon.AllocationTests.test_multiple_chunks_all_faulted) ... ok
+test_oom_after_last_page_still_fails (test_native_balloon.AllocationTests.test_oom_after_last_page_still_fails) ... ok
+test_oom_delta_aborts_and_closes (test_native_balloon.AllocationTests.test_oom_delta_aborts_and_closes) ... ok
+test_physical_limit_rejected_before_mapping (test_native_balloon.AllocationTests.test_physical_limit_rejected_before_mapping) ... ok
+test_real_mapping_faults_every_page (test_native_balloon.AllocationTests.test_real_mapping_faults_every_page) ... ok
+test_rounds_up_for_every_host_page_size (test_native_balloon.AllocationTests.test_rounds_up_for_every_host_page_size) ... ok
+test_signal_exception_releases_mapping (test_native_balloon.AllocationTests.test_signal_exception_releases_mapping) ... ok
+test_timeout_after_last_page_still_fails (test_native_balloon.AllocationTests.test_timeout_after_last_page_still_fails) ... ok
+test_zero_is_exact (test_native_balloon.AllocationTests.test_zero_is_exact) ... ok
+test_atomic_status_private_and_numeric (test_native_balloon.MetadataTests.test_atomic_status_private_and_numeric) ... ok
+test_meminfo_requires_consistent_real_units (test_native_balloon.MetadataTests.test_meminfo_requires_consistent_real_units) ... ok
+test_missing_or_relative_notify_rejected (test_native_balloon.MetadataTests.test_missing_or_relative_notify_rejected) ... ok
+test_oom_counter_is_required (test_native_balloon.MetadataTests.test_oom_counter_is_required) ... ok
+test_status_ancestor_symlink_is_rejected (test_native_balloon.MetadataTests.test_status_ancestor_symlink_is_rejected) ... ok
+test_status_leaf_symlink_does_not_truncate_target (test_native_balloon.MetadataTests.test_status_leaf_symlink_does_not_truncate_target) ... ok
+test_legacy_override_is_rejected_before_allocation (test_native_balloon.ProcessTests.test_legacy_override_is_rejected_before_allocation) ... ok
+test_missing_notification_cannot_claim_success (test_native_balloon.ProcessTests.test_missing_notification_cannot_claim_success) ... ok
+test_real_abstract_notification_and_release (test_native_balloon.ProcessTests.test_real_abstract_notification_and_release) ... ok
+test_real_path_notification_and_graceful_release (test_native_balloon.ProcessTests.test_real_path_notification_and_graceful_release) ... ok
+
+----------------------------------------------------------------------
+Ran 23 tests in 2.402s
+
+OK

@@ -1,0 +1,4 @@
+Verified complete patched source, Cargo.lock and offline recovery archive
+ERROR: Host rustc not found: 'rustc'. Put the installed tools on PATH or set HOST_RUSTC=/absolute/path. Automatic Rust installation is disabled; no host configuration was changed.
+make[1]: *** [Makefile:48: doctor] Error 1
+make: *** [Makefile:63: native-validate] Error 2

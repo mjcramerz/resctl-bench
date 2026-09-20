@@ -1,3 +1,8 @@
+# 2.4.0 - Native v3 lifecycle, exact allocation and matched Lab 2.5.0
+
+See README.md, docs/VALIDATION.md and the current failure-analysis document.
+This is source, not a claimed target-host benchmark result.
+
 # 2.3.3 - Restrictive-umask packaging and publication/install repair
 
 The exact reported `biolatpcts.py` mode failure was reproduced after ordinary-user

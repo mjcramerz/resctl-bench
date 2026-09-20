@@ -36,7 +36,7 @@ class RustTestSelectionOrchestration(unittest.TestCase):
     """Cargo is a deliberate double, never evidence of a Rust pass."""
     def test_filters_have_unique_logs_and_required_counts(self):
         counts={'misc::support_tests::':10,'storage_info::source_resolution_tests::':8,
-                'slices::io_policy_tests::':6,'runtime_contract_tests::':3}
+                'slices::io_policy_tests::':6,'runtime_contract_tests::':3, 'systemd::lifecycle_tests::':3, 'side::balloon_health_tests::':4}
         with tempfile.TemporaryDirectory() as tmp:
             b=bk.Builder(Path(tmp),bk.Config.from_env({}));calls=[]
             def cargo(action,args,env,*,log):
@@ -46,8 +46,8 @@ class RustTestSelectionOrchestration(unittest.TestCase):
                 return ''
             with patch.object(b,'cargo_context',return_value=({}, {'build_id':'fixture','host':'fixture'})),patch.object(b,'cargo',side_effect=cargo):
                 result=b.runtime_tests()
-            self.assertEqual(result['passed'],27)
-            self.assertEqual({x[0] for x in calls},set(counts));self.assertEqual(len({x[1] for x in calls}),4)
+            self.assertEqual(result['passed'],34)
+            self.assertEqual({x[0] for x in calls},set(counts));self.assertEqual(len({x[1] for x in calls}),6)
     def test_empty_test_filter_never_counts_as_passed(self):
         with tempfile.TemporaryDirectory() as tmp:
             b=bk.Builder(Path(tmp),bk.Config.from_env({}))

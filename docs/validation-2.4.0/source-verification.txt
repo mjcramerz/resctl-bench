@@ -1,0 +1,3 @@
+Verified source: /mnt/data/work/resctl-bench/upstream (bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b)
+Verified complete patched source, Cargo.lock and offline recovery archive
+Syntax/whitespace checks passed: 19 Python files

@@ -1,3 +1,5 @@
+> Historical repair background. Current paired release instructions and native v3 requirements are in ../README.md and VALIDATION.md. Older markers/counts below are not the current runtime contract.
+
 > Historical repair background retained from the supplied source. For the
 > current uploaded failures and this revision, read DELIVERY-REPAIR.md.
 

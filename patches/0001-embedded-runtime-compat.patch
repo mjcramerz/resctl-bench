@@ -12,10 +12,10 @@ index c3564b8..08cc00c 100644
               --linux-tar=[FILE] 'Path to linux source tarball for compile sideload (__SKIP__ to skip)'
               --bench-file=[FILE] 'Bench file name override'
 diff --git a/rd-agent/README.md b/rd-agent/README.md
-index 570981a..27625ca 100644
+index 570981a..ddc742a 100644
 --- a/rd-agent/README.md
 +++ b/rd-agent/README.md
-@@ -33,3 +33,45 @@ want to explore the control files.
+@@ -33,3 +33,63 @@ want to explore the control files.
  more information on the containing projects, visit:
  
    https://github.com/facebookexperimental/resctl-demo
@@ -37,7 +37,7 @@ index 570981a..27625ca 100644
 +```
 +
 +The destination must not already exist and the option must be used alone.
-+This path only exports the four embedded support files. It does not construct
++This path only exports the five embedded support files. It does not construct
 +normal agent configuration, access a disk, run systemd, change swap, attach BPF,
 +or run a workload. Normal agent execution still checks the actual BPF collector;
 +the export path is not a bypass for benchmark requirements.
@@ -46,9 +46,9 @@ index 570981a..27625ca 100644
 +symlink regressions. See the containing build kit's `docs/NATIVE-REPAIR.md` for
 +the source patch, compatibility contract and mandatory packaging checks.
 +
-+### IOCost Lab native repair contract (v2)
++### IOCost Lab native repair contract (v3)
 +
-+`rd-agent --runtime-contract` prints `resctl-iocost-lab-v2` and exits without
++`rd-agent --runtime-contract` prints `resctl-iocost-lab-v3` and exits without
 +reading configuration or touching systemd, cgroups, BPF, swap or storage. The
 +same exact file-only argument is supported by resctl-bench, rd-hashd and
 +resctl-demo. Extra arguments are not interpreted as a successful probe.
@@ -61,8 +61,214 @@ index 570981a..27625ca 100644
 +reviewing placement overrides, reboot a maintenance host instead of restarting
 +D-Bus during an active session. resctl-bench returns an ordinary nonzero error
 +for a rejected job rather than deliberately panicking on that error.
++
++
++### Exact balloon lifecycle (v3)
++
++The embedded memory-balloon.py is included in support export and side assets.
++Only the native agent controls its lifetime. READY means the requested bytes,
++rounded up to a host page, were fully touched. The transient service uses
++Restart=no and MemorySwapMax=0. It never shrinks/retries its target or reports
++partial readiness. Service identity and policy are checked during hashd
++calibration as well as ordinary execution; unexpected loss/restart is fatal.
++Native resize explicitly stops/resets the previous unit. Stop jobs use replace
++and checked waits so an old queued start cannot conflict with teardown. Ordinary
++command errors propagate after releasing reporter locks, not through panic.
++
++External adaptive/restart drop-ins are incompatible with this measurement
++contract. Restore the old Lab session before starting a fresh v3 run. A compiler
++or file-only export test cannot certify live kernel/systemd behavior; the build
++kit's validation report states which checks have actually been executed.
+diff --git a/rd-agent/src/cmd.rs b/rd-agent/src/cmd.rs
+index 4a6b51a..5faeaf5 100644
+--- a/rd-agent/src/cmd.rs
++++ b/rd-agent/src/cmd.rs
+@@ -101,7 +101,7 @@ impl RunnerData {
+         }
+     }
+ 
+-    fn maybe_reload(&mut self) -> bool {
++    fn maybe_reload(&mut self) -> Result<bool> {
+         let sobjs = &mut self.sobjs;
+         let last_cpu_headroom = sobjs.cmd_file.data.sideloader.cpu_headroom;
+ 
+@@ -140,10 +140,7 @@ impl RunnerData {
+         }
+ 
+         if (re_bench || re_oomd) && self.cfg.enforce.oomd {
+-            if let Err(e) = sobjs.oomd.apply() {
+-                error!("cmd: Failed to apply oomd configuration ({:?})", &e);
+-                panic!();
+-            }
++            sobjs.oomd.apply().context("applying oomd configuration")?;
+         }
+ 
+         let mut apply_sideloader = false;
+@@ -177,13 +174,11 @@ impl RunnerData {
+         if apply_sideloader && self.cfg.enforce.all() {
+             let sideloader_cmd = &sobjs.cmd_file.data.sideloader;
+             let slice_knobs = &sobjs.slice_file.data;
+-            if let Err(e) = sobjs.sideloader.apply(sideloader_cmd, slice_knobs) {
+-                error!("cmd: Failed to apply sideloader changes ({:?})", &e);
+-                panic!();
+-            }
++            sobjs.sideloader.apply(sideloader_cmd, slice_knobs)
++                .context("applying sideloader configuration")?;
+         }
+ 
+-        re_bench || re_cmd || re_slice
++        Ok(re_bench || re_cmd || re_slice)
+     }
+ 
+     fn apply_swappiness(&self, swappiness: Option<u32>) -> Result<()> {
+@@ -258,14 +253,8 @@ impl RunnerData {
+                     self.force_apply = true;
+                 } else if cmd.bench_hashd_seq > bench.hashd_seq {
+                     if bench.iocost_seq > 0 || self.cfg.force_running {
+-                        if let Err(e) = self.balloon.set_size(cmd.bench_hashd_balloon_size) {
+-                            error!(
+-                                "cmd: Failed to set balloon size to {:.2}G for hashd bench ({:?})",
+-                                to_gb(cmd.bench_hashd_balloon_size),
+-                                &e
+-                            );
+-                            panic!();
+-                        }
++                        self.balloon.set_size(cmd.bench_hashd_balloon_size)
++                            .context("balloon: cannot establish exact hashd calibration allocation")?;
+ 
+                         self.sobjs.oomd.stop();
+ 
+@@ -297,10 +286,7 @@ impl RunnerData {
+                 {
+                     self.become_idle();
+                 } else {
+-                    if let Err(e) = self.apply_workloads() {
+-                        error!("cmd: Failed to apply workload changes ({:?})", &e);
+-                        panic!();
+-                    }
++                    self.apply_workloads().context("applying workload changes")?;
+ 
+                     let side_defs = &self.sobjs.side_def_file.data;
+                     let sysload_target = &self.sobjs.cmd_file.data.sysloads;
+@@ -322,17 +308,12 @@ impl RunnerData {
+                         warn!("cmd: Failed to apply sideload changes ({:?})", &e);
+                     }
+ 
+-                    let balloon_size = ((total_memory() as f64)
+-                        * &self.sobjs.cmd_file.data.balloon_ratio)
+-                        as usize;
+-                    if let Err(e) = self.balloon.set_size(balloon_size) {
+-                        error!(
+-                            "cmd: Failed to set balloon size to {:.2}G ({:?})",
+-                            to_gb(balloon_size),
+-                            &e
+-                        );
+-                        panic!();
+-                    }
++                    let ratio = self.sobjs.cmd_file.data.balloon_ratio;
++                    anyhow::ensure!(ratio.is_finite() && (0.0..=1.0).contains(&ratio),
++                                    "balloon: invalid ratio {}", ratio);
++                    let balloon_size = ((total_memory() as f64) * ratio) as usize;
++                    self.balloon.set_size(balloon_size)
++                        .context("balloon: cannot establish exact workload allocation")?;
+                 }
+             }
+             BenchHashd => {
+@@ -356,6 +337,7 @@ impl RunnerData {
+     }
+ 
+     fn check_completions(&mut self) -> Result<()> {
++        self.balloon.check_health()?;
+         match self.state {
+             BenchHashd | BenchIoCost => {
+                 let svc = if self.state == BenchHashd {
+@@ -382,9 +364,8 @@ impl RunnerData {
+                         Ok(())
+                     }
+                     state => {
+-                        warn!("cmd: Invalid state {:?} for {}", &state, &svc.unit.name);
+-                        self.become_idle();
+-                        Ok(())
++                        anyhow::bail!("native benchmark service {} ended in {:?}; results invalid",
++                                      svc.unit.name, state)
+                     }
+                 }
+             }
+@@ -405,7 +386,7 @@ impl Runner {
+         }
+     }
+ 
+-    pub fn run(&mut self) {
++    pub fn run(&mut self) -> Result<()> {
+         let mut reporter = None;
+         let mut last_health_check_at = Instant::now();
+         let mut cmd_pending = true;
+@@ -425,15 +406,19 @@ impl Runner {
+                         Ok(true) => {}
+                         Ok(false) => break,
+                         Err(e) => {
+-                            warn!("cmd: Failed to apply commands ({:?})", &e);
+-                            break;
++                            // Release the guard before joining the reporter.
++                            drop(data);
++                            drop(reporter);
++                            return Err(e.context("applying native commands"));
+                         }
+                     }
+                 }
+             }
+ 
+             if let Err(e) = data.check_completions() {
+-                warn!("cmd: Failed to check completions ({:?})", &e);
++                drop(data);
++                drop(reporter);
++                return Err(e.context("checking native service health"));
+             }
+ 
+             // Stopping sys/sideloads and clearing scratch dirs can
+@@ -444,13 +429,8 @@ impl Runner {
+             drop(removed_sideloads);
+ 
+             if reporter.is_none() {
+-                reporter = Some(match report::Reporter::new(self.clone()) {
+-                    Ok(v) => v,
+-                    Err(e) => {
+-                        error!("cmd: Failed to start reporter ({:?})", &e);
+-                        panic!();
+-                    }
+-                });
++                reporter = Some(report::Reporter::new(self.clone())
++                    .context("starting native reporter")?);
+             }
+ 
+             // sleep a bit and start the next iteration
+@@ -484,10 +464,21 @@ impl Runner {
+                 verify_pending = false;
+             }
+ 
+-            if data.maybe_reload() {
+-                cmd_pending = true;
+-                verify_pending = true;
++            match data.maybe_reload() {
++                Ok(true) => {
++                    cmd_pending = true;
++                    verify_pending = true;
++                }
++                Ok(false) => {}
++                Err(e) => {
++                    drop(data);
++                    drop(reporter);
++                    return Err(e.context("reloading native configuration"));
++                }
+             }
+         }
++        drop(data);
++        drop(reporter);
++        Ok(())
+     }
+ }
 diff --git a/rd-agent/src/main.rs b/rd-agent/src/main.rs
-index 623eb4e..9ed948d 100644
+index 623eb4e..34d0f37 100644
 --- a/rd-agent/src/main.rs
 +++ b/rd-agent/src/main.rs
 @@ -611,13 +611,14 @@ impl Config {
@@ -112,8 +318,21 @@ index 623eb4e..9ed948d 100644
      assert_eq!(*VERSION, *rd_agent_intf::VERSION);
      Args::set_help_body(std::str::from_utf8(include_bytes!("../README.md")).unwrap());
  
+@@ -1366,5 +1381,11 @@ fn main() {
+         }
+     }
+ 
+-    cmd::Runner::new(cfg, sobjs).run();
++    let result = cmd::Runner::new(cfg, sobjs).run();
++    if let Err(error) = result {
++        error!("agent: native execution failed: {:#}", error);
++        // Restore IOCost before process::exit, which otherwise skips Drop.
++        drop(_iocost_sys_save);
++        std::process::exit(1);
++    }
+ }
 diff --git a/rd-agent/src/misc.rs b/rd-agent/src/misc.rs
-index d8cc2a5..67e22b1 100644
+index d8cc2a5..74eee78 100644
 --- a/rd-agent/src/misc.rs
 +++ b/rd-agent/src/misc.rs
 @@ -1,6 +1,12 @@
@@ -131,22 +350,37 @@ index d8cc2a5..67e22b1 100644
  use std::process::Command;
  
  use rd_util::*;
-@@ -22,10 +28,85 @@ const MISC_BINS: [(&str, &[u8]); 4] = [
+@@ -9,7 +15,8 @@ use rd_util::*;
+ // giving up.
+ pub const BCC_RETRIES: u32 = 2;
+ 
+-const MISC_BINS: [(&str, &[u8]); 4] = [
++const MISC_BINS: [(&str, &[u8]); 5] = [
++    ("memory-balloon.py", include_bytes!("misc/memory-balloon.py")),
+     (
+         "iocost_coef_gen.py",
+         include_bytes!("misc/iocost_coef_gen.py"),
+@@ -22,10 +29,89 @@ const MISC_BINS: [(&str, &[u8]); 4] = [
      ),
  ];
  
 -pub fn prepare_misc_bins(cfg: &Config, prepare_only: bool) -> Result<()> {
+-    for (name, body) in &MISC_BINS {
+-        prepare_bin_file(&format!("{}/{}", &cfg.misc_bin_path, name), body)?;
 +// These are generated runtime assets, not administrator configuration. Reconcile
 +// them with THIS executable on every startup, including non-reset upgrades.
 +// Never follow a generated-file symlink or truncate an existing helper in place.
 +fn write_misc_bins(directory: &Path) -> Result<()> {
++    write_embedded_bins(directory, &MISC_BINS)
++}
++
++pub(crate) fn write_embedded_bins(directory: &Path, bins: &[(&str, &[u8])]) -> Result<()> {
 +    let meta = fs::symlink_metadata(directory)?;
 +    if !meta.is_dir() || meta.file_type().is_symlink() {
 +        bail!("misc support directory must be a real directory: {:?}", directory);
 +    }
 +    static NEXT_TMP: AtomicU64 = AtomicU64::new(0);
-     for (name, body) in &MISC_BINS {
--        prepare_bin_file(&format!("{}/{}", &cfg.misc_bin_path, name), body)?;
++    for (name, body) in bins {
 +        let path = directory.join(name);
 +        match fs::symlink_metadata(&path) {
 +            Ok(meta) => {
@@ -179,7 +413,7 @@ index d8cc2a5..67e22b1 100644
 +            let _ = fs::remove_file(&temporary);
 +        }
 +        result.with_context(|| format!("materialize embedded helper {:?}", path))?;
-     }
++    }
 +    Ok(())
 +}
 +
@@ -191,7 +425,7 @@ index d8cc2a5..67e22b1 100644
 +        s.to_str().map_or(false, |s| s.starts_with("--export-support=")));
 +    if !present {
 +        return None;
-+    }
+     }
 +    let path = if args.len() == 2 && args[0] == "--export-support" {
 +        Some(PathBuf::from(&args[1]))
 +    } else if args.len() == 1 {
@@ -219,7 +453,7 @@ index d8cc2a5..67e22b1 100644
  
      if !prepare_only && cfg.biolatpcts_bin.is_some() {
          let mut retries = BCC_RETRIES;
-@@ -45,3 +126,123 @@ pub fn prepare_misc_bins(cfg: &Config, prepare_only: bool) -> Result<()> {
+@@ -45,3 +131,123 @@ pub fn prepare_misc_bins(cfg: &Config, prepare_only: bool) -> Result<()> {
  
      Ok(())
  }
@@ -387,6 +621,221 @@ index ce0f105..5e12199 100755
 +# IOCost Lab: use the checked Debian interpreter and local compatibility helper.
 +# No global Python/BCC/kernel files or vendor binaries are changed.
 +exec /usr/bin/python3 -I -B "$(dirname "$0")/biolatpcts.py" "$@"
+diff --git a/rd-agent/src/misc/memory-balloon.py b/rd-agent/src/misc/memory-balloon.py
+new file mode 100755
+index 0000000..1de0425
+--- /dev/null
++++ b/rd-agent/src/misc/memory-balloon.py
+@@ -0,0 +1,209 @@
++#!/usr/bin/python3
++# SPDX-License-Identifier: GPL-2.0
++# Copyright (c) Facebook, Inc. and its affiliates.
++"""Exact, native-owned, non-swappable memory balloon for resctl calibration.
++
++The caller supplies a byte count. We round UP to the host page size, fault every
++page, and only then send READY=1. Never shrink, restart, or report partial success:
++changing the held memory invalidates the native calibration's arithmetic.
++
++systemd owns process lifetime and enforces MemorySwapMax=0. No third-party modules,
++children, global sysctl writes, cache drops, or workload modification are used.
++"""
++from __future__ import annotations
++
++import argparse
++import json
++import mmap
++import os
++from pathlib import Path
++import re
++import signal
++import socket
++import sys
++import tempfile
++import time
++
++MIB = 1024 * 1024
++START_TIMEOUT = 12.0  # below rd-util's default 15-second systemd start deadline
++CHUNK = 16 * MIB
++
++
++class BalloonError(RuntimeError):
++    pass
++
++
++class Stopped(Exception):
++    pass
++
++
++def rounded_size(value: str, page: int) -> int:
++    if not re.fullmatch(r'[0-9]+', value) or len(value) > 20:
++        raise BalloonError('BYTES must be a non-negative decimal integer')
++    if page <= 0 or page & (page - 1):
++        raise BalloonError('invalid operating-system page size')
++    size = int(value)
++    if size > sys.maxsize - page + 1:
++        raise BalloonError('BYTES exceeds the address-space integer limit')
++    return ((size + page - 1) // page) * page
++
++
++def memory_info(path: Path = Path('/proc/meminfo')) -> dict[str, int]:
++    values = {}
++    for line in path.read_text().splitlines():
++        parts = line.split()
++        if parts and parts[0] in ('MemTotal:', 'MemAvailable:'):
++            if len(parts) != 3 or parts[2] != 'kB' or not parts[1].isdigit():
++                raise BalloonError('invalid physical-memory counters')
++            key = parts[0][:-1]
++            if key in values:
++                raise BalloonError('duplicate physical-memory counter')
++            values[key] = int(parts[1]) * 1024
++    if not 0 <= values.get('MemAvailable', -1) <= values.get('MemTotal', -2):
++        raise BalloonError('missing/inconsistent physical-memory counters')
++    if values['MemTotal'] <= 0:
++        raise BalloonError('invalid physical-memory size')
++    return values
++
++
++def oom_count(path: Path = Path('/proc/vmstat')) -> int:
++    for line in path.read_text().splitlines():
++        fields = line.split()
++        if fields and fields[0] == 'oom_kill':
++            if len(fields) != 2 or not fields[1].isdigit():
++                break
++            return int(fields[1])
++    raise BalloonError('cannot read the kernel OOM counter')
++
++
++def notify(message: str, address: str | None = None) -> None:
++    address = os.environ.get('NOTIFY_SOCKET') if address is None else address
++    if not address or address[0] not in ('/', '@'):
++        raise BalloonError('an absolute or abstract systemd NOTIFY_SOCKET is required')
++    if address.startswith('@'):
++        address = '\0' + address[1:]
++    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as channel:
++        channel.connect(address)
++        channel.sendall(message.encode('utf-8'))
++
++
++def write_status(path: Path | None, **fields) -> None:
++    if path is None:
++        return
++    # The native owner passes a file within its pre-created work directory.
++    # Atomic replace never follows an existing leaf symlink or truncates a link.
++    if (not path.is_absolute() or '..' in path.parts or not path.parent.is_dir()
++            or any(parent.is_symlink() for parent in path.parents)):
++        raise BalloonError('status must be in an existing absolute work directory')
++    row = {'schema': 1, 'pid': os.getpid(), 'epoch': time.time(),
++           'monotonic': time.monotonic(), **fields}
++    fd, temporary = tempfile.mkstemp(prefix='.balloon-status-', dir=path.parent)
++    try:
++        with os.fdopen(fd, 'w') as stream:
++            json.dump(row, stream, sort_keys=True)
++            stream.write('\n')
++            stream.flush()
++            os.fsync(stream.fileno())
++        os.replace(temporary, path)
++    finally:
++        if os.path.exists(temporary):
++            os.unlink(temporary)
++
++
++def allocate_exact(size: int, page: int, deadline: float, initial_oom: int,
++                   *, read_memory=memory_info, read_oom=oom_count,
++                   clock=time.monotonic, sleep=time.sleep):
++    """Fault a real private mapping; clean it up on EVERY incomplete start.
++
++    MemAvailable is only an allocation admission signal, not a safety proof.
++    OOM monitoring is independent, and the agent monitors the service after READY.
++    A small reserve prevents this helper from intentionally consuming the last
++    reported available pages. Exhaustion fails the start; it never changes size.
++    """
++    info = read_memory()
++    reserve = max(128 * MIB, info['MemTotal'] // 64)
++    if size > max(0, info['MemTotal'] - reserve):
++        raise BalloonError('requested balloon exceeds physical RAM minus emergency reserve')
++    if size == 0:
++        return None
++    mapping = mmap.mmap(-1, size, flags=mmap.MAP_PRIVATE | mmap.MAP_ANONYMOUS,
++                        prot=mmap.PROT_READ | mmap.PROT_WRITE)
++    try:
++        # Avoid huge-page allocation/compaction surprises; this is a base-page
++        # accounting workload, not a THP benchmark. MADV_NOHUGEPAGE is Linux-only.
++        if hasattr(mmap, 'MADV_NOHUGEPAGE'):
++            mapping.madvise(mmap.MADV_NOHUGEPAGE)
++        for start in range(0, size, max(page, CHUNK // page * page)):
++            end = min(size, start + max(page, CHUNK // page * page))
++            while True:
++                if read_oom() != initial_oom:
++                    raise BalloonError('kernel OOM counter changed while inflating balloon')
++                if clock() >= deadline:
++                    raise BalloonError('exact balloon allocation timed out; no READY sent')
++                if read_memory()['MemAvailable'] >= end - start + reserve:
++                    break
++                sleep(0.05)
++            for offset in range(start, end, page):
++                mapping[offset] = 1
++        if read_oom() != initial_oom:
++            raise BalloonError('kernel OOM counter changed while inflating balloon')
++        if clock() >= deadline:
++            raise BalloonError('exact balloon allocation exceeded startup deadline')
++        return mapping
++    except BaseException:
++        mapping.close()
++        raise
++
++
++def main(argv: list[str] | None = None) -> int:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('bytes', metavar='BYTES')
++    parser.add_argument('--status', type=Path, help='native work-directory status file')
++    args = parser.parse_args(argv)
++    held = None
++    ready = False
++    size = 0
++
++    def stop(_signum, _frame):
++        raise Stopped()
++
++    signal.signal(signal.SIGTERM, stop)
++    signal.signal(signal.SIGINT, stop)
++    try:
++        if os.environ.get('IOCOST_BALLOON_STATE_DIR'):
++            raise BalloonError('legacy IOCost balloon override detected; restore the old session first')
++        size = rounded_size(args.bytes, os.sysconf('SC_PAGE_SIZE'))
++        # Validate notification transport BEFORE allocating potentially large RAM.
++        notify('STATUS=Allocating exact native balloon')
++        write_status(args.status, state='allocating', requested_bytes=int(args.bytes), held_bytes=0,
++                     rounded_bytes=size)
++        held = allocate_exact(size, os.sysconf('SC_PAGE_SIZE'),
++                              time.monotonic() + START_TIMEOUT, oom_count())
++        write_status(args.status, state='ready', requested_bytes=int(args.bytes),
++                     rounded_bytes=size, held_bytes=size)
++        notify('READY=1\nSTATUS=Holding exactly %d bytes' % size)
++        ready = True
++        # No adaptive changes or automatic restart. The native agent supervises
++        # liveness; SIGTERM releases the mapping during a native resize/teardown.
++        while True:
++            signal.pause()
++    except Stopped:
++        return 0 if ready else 1
++    except (BalloonError, OSError, ValueError, OverflowError, MemoryError) as exc:
++        print('balloon: ' + str(exc), file=sys.stderr, flush=True)
++        return 1
++    finally:
++        # Ignore further termination signals so release/status cleanup completes.
++        signal.signal(signal.SIGTERM, signal.SIG_IGN)
++        signal.signal(signal.SIGINT, signal.SIG_IGN)
++        if held is not None:
++            held.close()
++        try:
++            write_status(args.status, state='stopped', requested_bytes=int(args.bytes) if re.fullmatch(r'[0-9]{1,20}', args.bytes) else None,
++                         rounded_bytes=size, held_bytes=0, was_ready=ready)
++        except (OSError, BalloonError, MemoryError) as exc:
++            print('balloon: cannot publish stopped status: ' + str(exc), file=sys.stderr)
++
++
++if __name__ == '__main__':
++    sys.exit(main())
 diff --git a/rd-agent/src/report.rs b/rd-agent/src/report.rs
 index cebdfd7..7d95210 100644
 --- a/rd-agent/src/report.rs
@@ -435,6 +884,256 @@ index cebdfd7..7d95210 100644
                      }
                  },
                  recv(self.term_rx) -> term => {
+diff --git a/rd-agent/src/side.rs b/rd-agent/src/side.rs
+index d288152..8421981 100644
+--- a/rd-agent/src/side.rs
++++ b/rd-agent/src/side.rs
+@@ -1,5 +1,5 @@
+ // Copyright (c) Facebook, Inc. and its affiliates.
+-use super::{prepare_bin_file, Config};
++use super::Config;
+ use anyhow::{anyhow, bail, Result};
+ use log::{debug, error, info, warn};
+ use serde::{Deserialize, Serialize};
+@@ -28,7 +28,7 @@ const SIDE_BINS: [(&str, &[u8]); 6] = [
+     ("mem-hog.sh", include_bytes!("side/mem-hog.sh")),
+     (
+         "memory-balloon.py",
+-        include_bytes!("side/memory-balloon.py"),
++        include_bytes!("misc/memory-balloon.py"),
+     ),
+     ("read-bomb.py", include_bytes!("side/read-bomb.py")),
+     ("burn-cpus.sh", include_bytes!("side/burn-cpus.sh")),
+@@ -39,10 +39,7 @@ const SIDE_BINS: [(&str, &[u8]); 6] = [
+ ];
+ 
+ pub fn prepare_side_bins(cfg: &Config) -> Result<()> {
+-    for (name, body) in &SIDE_BINS {
+-        prepare_bin_file(&format!("{}/{}", &cfg.side_bin_path, name), body)?;
+-    }
+-    Ok(())
++    super::misc::write_embedded_bins(std::path::Path::new(&cfg.side_bin_path), &SIDE_BINS)
+ }
+ 
+ fn verify_linux_tar(path: &str) -> bool {
+@@ -462,6 +459,7 @@ pub struct Balloon {
+     cfg: Arc<Config>,
+     size: usize,
+     svc: Option<TransientService>,
++    identity: Option<(u32, u64)>,
+ }
+ 
+ impl Balloon {
+@@ -484,45 +482,138 @@ impl Balloon {
+             cfg,
+             svc: None,
+             size: 0,
++            identity: None,
+         }
+     }
+ 
+-    pub fn set_size(&mut self, size: usize) -> Result<()> {
+-        if self.size == size {
+-            if let Some(svc) = self.svc.as_mut() {
+-                if let Ok(()) = svc.unit.refresh() {
+-                    if svc.unit.state == systemd::UnitState::Running {
+-                        return Ok(());
+-                    }
+-                }
++    /// A missing or restarted balloon invalidates the calibration. It must not
++    /// be silently recreated at the same nominal size after an OOM.
++    pub fn check_health(&mut self) -> Result<()> {
++        match self.svc.as_mut() {
++            Some(svc) => {
++                svc.unit.refresh()?;
++                self.identity = Some(validate_balloon_identity(
++                    &svc.unit.state,
++                    svc.unit.props.u32("MainPID"),
++                    svc.unit.props.u64_dfl_max("ExecMainStartTimestampMonotonic"),
++                    svc.unit.props.string("Restart"),
++                    svc.unit.props.u64_dfl_max("MemorySwapMax"),
++                    self.identity,
++                )?);
+             }
++            None if self.size != 0 => bail!("balloon: allocation ownership lost"),
++            None => {}
+         }
++        Ok(())
++    }
+ 
+-        self.svc.take();
+-
++    pub fn set_size(&mut self, size: usize) -> Result<()> {
++        self.check_health()?;
++        if size > total_memory() as usize {
++            bail!("balloon: request {} exceeds physical memory", size);
++        }
++        if self.size == size {
++            return self.check_health();
++        }
++        // Do not rely on Drop's best-effort cleanup before reusing a unit name.
++        // A failing stop leaves ownership here and propagates to the agent.
++        if let Some(svc) = self.svc.as_mut() {
++            svc.unit.stop_and_reset()?;
++            svc.keep = true; // already stopped; no duplicate stop from Drop
++        }
++        self.svc = None;
++        self.size = 0;
++        self.identity = None;
+         if size == 0 {
+             return Ok(());
+         }
+ 
+         let mut svc = TransientService::new_sys(
+             Self::UNIT_NAME.into(),
+-            vec![self.cfg.balloon_bin.clone(), format!("{}", size)],
++            vec![self.cfg.balloon_bin.clone(), format!("{}", size),
++                 "--status".into(), format!("{}/balloon-status.json", self.cfg.top_path)],
+             vec![],
+-            Some(0o002),
++            Some(0o077),
+         )?;
+-
+-        svc.set_slice(Slice::Sys.name())
+-            // Make sure memory allocation completed once started
++        svc.set_slice("balloon.slice")
+             .add_prop("Type".into(), systemd::Prop::String("notify".into()))
+-            .add_prop("MemorySwapMax".into(), systemd::Prop::U64(0))
+-            .add_prop(
+-                "Slice".into(),
+-                systemd::Prop::String("balloon.slice".into()),
+-            );
++            .add_prop("NotifyAccess".into(), systemd::Prop::String("main".into()))
++            .add_prop("Restart".into(), systemd::Prop::String("no".into()))
++            .add_prop("RemainAfterExit".into(), systemd::Prop::Bool(false))
++            .add_prop("TimeoutStartUSec".into(), systemd::Prop::U64(15_000_000))
++            .add_prop("TimeoutStopUSec".into(), systemd::Prop::U64(3_000_000))
++            .add_prop("MemorySwapMax".into(), systemd::Prop::U64(0));
+         svc.start()?;
+-
+         self.size = size;
+         self.svc = Some(svc);
+-        Ok(())
++        self.check_health()
++    }
++}
++
++
++/// READY is not enough: a restarted process at the same unit name is different
++/// calibration state. Timestamp prevents PID reuse from concealing replacement.
++fn validate_balloon_identity(
++    state: &systemd::UnitState,
++    pid: Option<u32>,
++    started: Option<u64>,
++    restart: Option<&str>,
++    swap_max: Option<u64>,
++    previous: Option<(u32, u64)>,
++) -> Result<(u32, u64)> {
++    if *state != systemd::UnitState::Running || restart != Some("no") || swap_max != Some(0) {
++        bail!("balloon: allocation lost or overridden lifetime/swap policy; measurements invalid");
++    }
++    let current = match (pid, started) {
++        (Some(pid), Some(started)) if pid > 0 && started > 0 => (pid, started),
++        _ => bail!("balloon: missing process identity; measurements invalid"),
++    };
++    if previous.map_or(false, |old| old != current) {
++        bail!("balloon: process restarted outside native resize; measurements invalid");
++    }
++    Ok(current)
++}
++
++#[cfg(test)]
++mod balloon_health_tests {
++    use super::*;
++    use systemd::UnitState as US;
++
++    #[test]
++    fn unchanged_allocation_is_healthy() {
++        assert_eq!(validate_balloon_identity(&US::Running, Some(42), Some(123),
++                   Some("no"), Some(0), Some((42, 123))).unwrap(), (42, 123));
++    }
++
++    #[test]
++    fn replacement_and_pid_reuse_are_fatal() {
++        for current in [(43, 124), (42, 124)] {
++            assert!(validate_balloon_identity(&US::Running, Some(current.0), Some(current.1),
++                    Some("no"), Some(0), Some((42, 123))).is_err());
++        }
++    }
++
++    #[test]
++    fn failed_missing_or_restarting_is_fatal() {
++        for state in [US::Failed("failed".into()), US::NotFound, US::Inactive("dead".into()), US::Exited,
++                      US::Other("activating".into())] {
++            assert!(validate_balloon_identity(&state, Some(42), Some(123),
++                    Some("no"), Some(0), None).is_err());
++        }
++    }
++
++    #[test]
++    fn policy_overrides_and_missing_identity_are_fatal() {
++        for (pid, start, restart, swap) in [
++            (None, Some(123), Some("no"), Some(0)),
++            (Some(0), Some(123), Some("no"), Some(0)),
++            (Some(42), None, Some("no"), Some(0)),
++            (Some(42), Some(0), Some("no"), Some(0)),
++            (Some(42), Some(123), Some("on-failure"), Some(0)),
++            (Some(42), Some(123), Some("no"), Some(4096)),
++            (Some(42), Some(123), Some("no"), None),
++        ] {
++            assert!(validate_balloon_identity(&US::Running, pid, start, restart, swap, None).is_err());
++        }
+     }
+ }
+diff --git a/rd-agent/src/side/memory-balloon.py b/rd-agent/src/side/memory-balloon.py
+deleted file mode 100755
+index 90aa933..0000000
+--- a/rd-agent/src/side/memory-balloon.py
++++ /dev/null
+@@ -1,43 +0,0 @@
+-#!/usr/bin/python3
+-# Copyright (c) Facebook, Inc. and its affiliates
+-
+-import mmap
+-import os
+-import sys
+-import time
+-import socket
+-
+-
+-if len(sys.argv) < 2:
+-    print("Usage: memory-balloon.py BYTES", file=sys.stderr)
+-    sys.exit(1)
+-
+-try:
+-    sd_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+-    sd_addr = os.getenv("NOTIFY_SOCKET")
+-    assert sd_addr, "$NOTIFY_SOCKET not available"
+-    sd_socket.connect(sd_addr)
+-except Exception:
+-    print("Failed to create systemd socket")
+-    raise
+-
+-nr_pages = int((int(sys.argv[1]) + 4095) / 4096)
+-mm = mmap.mmap(-1, nr_pages * 4096, flags=mmap.MAP_PRIVATE)
+-
+-last_at = time.time()
+-
+-for i in range(nr_pages):
+-    mm[i * 4096] = 1
+-    if time.time() >= last_at + 1 or i == nr_pages - 1:
+-        print(f"Touched {i * 4096 / (1 << 30):.2f}G")
+-        last_at = time.time()
+-
+-try:
+-    sd_socket.sendall(b"READY=1")
+-except Exception:
+-    print("Failed to send ready notification to systemd")
+-    raise
+-
+-print("Allocation done, sleeping...")
+-while True:
+-    time.sleep(600)
 diff --git a/rd-agent/src/slices.rs b/rd-agent/src/slices.rs
 index b575cc8..eccbd43 100644
 --- a/rd-agent/src/slices.rs
@@ -578,7 +1277,7 @@ index 9226925..b13b76a 100644
      Args::set_help_body(std::str::from_utf8(include_bytes!("../README.md")).unwrap());
  
 diff --git a/rd-util/src/lib.rs b/rd-util/src/lib.rs
-index 4d1bb2a..a0ce19a 100644
+index 4d1bb2a..c442157 100644
 --- a/rd-util/src/lib.rs
 +++ b/rd-util/src/lib.rs
 @@ -41,6 +41,43 @@ pub use json_file::{
@@ -587,7 +1286,7 @@ index 4d1bb2a..a0ce19a 100644
  
 +/// File-only compatibility probe, shared by every binary in this native family.
 +/// Keep independent of configuration, logging, systemd and workload initialization.
-+pub const IOCOST_LAB_CONTRACT: &str = "resctl-iocost-lab-v2";
++pub const IOCOST_LAB_CONTRACT: &str = "resctl-iocost-lab-v3";
 +
 +fn is_runtime_contract_request(args: &[OsString]) -> bool {
 +    args.len() == 1 && args[0] == OsStr::new("--runtime-contract")
@@ -791,6 +1490,373 @@ index c9801e5..928b6ac 100644
 +        assert!(findmnt_source(br#"{"filesystems":[{"source":"/dev/bad\u0000name"}]}"#).is_err());
 +    }
 +}
+diff --git a/rd-util/src/systemd.rs b/rd-util/src/systemd.rs
+index 18efaaa..87c4076 100644
+--- a/rd-util/src/systemd.rs
++++ b/rd-util/src/systemd.rs
+@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
+ pub const SYSTEMD_DFL_TIMEOUT: f64 = 15.0;
+ const SD1_DST: &str = "org.freedesktop.systemd1";
+ const SD1_PATH: &str = "/org/freedesktop/systemd1";
++const STOP_JOB_MODE: &str = "replace";
+ 
+ std::thread_local!(pub static SYS_SD_BUS: RefCell<SystemdDbus> =
+                    RefCell::new(SystemdDbus::new(false).unwrap()));
+@@ -125,7 +126,7 @@ impl SystemdDbus {
+     }
+ 
+     fn daemon_reload(&mut self) -> Result<()> {
+-        self.rt.block_on(self.manager_proxy().unwrap().reload())
++        self.rt.block_on(self.manager_proxy()?.reload())
+     }
+ 
+     pub fn get_unit_props<'u>(&mut self, name: &str) -> Result<HashMap<String, Prop>> {
+@@ -139,7 +140,18 @@ impl SystemdDbus {
+         ))?;
+ 
+         let props_owned: HashMap<String, OwnedValue> =
+-            self.rt.block_on(proxy.call("GetAll", &("",)))?;
++            match self.rt.block_on(proxy.call("GetAll", &("",))) {
++                Ok(props) => props,
++                Err(zbus::Error::MethodError(name, _, _))
++                    if name.as_str() == "org.freedesktop.systemd1.NoSuchUnit"
++                        || name.as_str() == "org.freedesktop.DBus.Error.UnknownObject" => {
++                    // Only an explicit missing object proves the unit is gone.
++                    let mut props = HashMap::new();
++                    props.insert("LoadState".into(), Prop::String("not-found".into()));
++                    return Ok(props);
++                }
++                Err(error) => return Err(error.into()),
++            };
+ 
+         let mut props = HashMap::new();
+ 
+@@ -172,8 +184,7 @@ impl SystemdDbus {
+             .collect();
+ 
+         self.rt.block_on(
+-            self.manager_proxy()
+-                .unwrap()
++            self.manager_proxy()?
+                 .set_unit_properties(name, false, map_props),
+         )?;
+         Ok(())
+@@ -181,25 +192,25 @@ impl SystemdDbus {
+ 
+     pub fn start_unit(&mut self, name: &str) -> Result<()> {
+         self.rt
+-            .block_on(self.manager_proxy().unwrap().start_unit(name, "fail"))?;
++            .block_on(self.manager_proxy()?.start_unit(name, "fail"))?;
+         Ok(())
+     }
+ 
+     pub fn stop_unit(&mut self, name: &str) -> Result<()> {
+         self.rt
+-            .block_on(self.manager_proxy().unwrap().stop_unit(name, "fail"))?;
++            .block_on(self.manager_proxy()?.stop_unit(name, STOP_JOB_MODE))?;
+         Ok(())
+     }
+ 
+     pub fn reset_failed_unit(&mut self, name: &str) -> Result<()> {
+         self.rt
+-            .block_on(self.manager_proxy().unwrap().reset_failed_unit(name))?;
++            .block_on(self.manager_proxy()?.reset_failed_unit(name))?;
+         Ok(())
+     }
+ 
+     pub fn restart_unit(&mut self, name: &str) -> Result<()> {
+         self.rt
+-            .block_on(self.manager_proxy().unwrap().restart_unit(name, "fail"))?;
++            .block_on(self.manager_proxy()?.restart_unit(name, "fail"))?;
+         Ok(())
+     }
+ 
+@@ -244,7 +255,7 @@ impl SystemdDbus {
+ 
+         let job = self
+             .rt
+-            .block_on(self.manager_proxy().unwrap().start_transient_unit(
++            .block_on(self.manager_proxy()?.start_transient_unit(
+                 name.as_str(),
+                 "fail",
+                 props,
+@@ -273,6 +284,11 @@ pub enum UnitState {
+ 
+ use UnitState as US;
+ 
++fn stopped_state(state: &US) -> bool {
++    matches!(state, US::NotFound | US::Inactive(_) | US::Failed(_))
++}
++
++
+ impl Default for UnitState {
+     fn default() -> Self {
+         US::NotFound
+@@ -298,6 +314,20 @@ impl UnitProps {
+         }
+     }
+ 
++    pub fn u32(&self, key: &str) -> Option<u32> {
++        match self.props.get(key) {
++            Some(Prop::U32(v)) => Some(*v),
++            _ => None,
++        }
++    }
++
++    pub fn boolean(&self, key: &str) -> Option<bool> {
++        match self.props.get(key) {
++            Some(Prop::Bool(v)) => Some(*v),
++            _ => None,
++        }
++    }
++
+     pub fn u64_dfl_max(&self, key: &str) -> Option<u64> {
+         match self.props.get(key) {
+             Some(Prop::U64(v)) if *v < std::u64::MAX => Some(*v),
+@@ -431,10 +461,10 @@ impl Unit {
+             Ok(props) => UnitProps::new(&props)?,
+             Err(e) => {
+                 debug!(
+-                    "Failed to unmarshall response from {}, assuming gone ({:?})",
++                    "Failed to read state of {} (preserving unknown state): {:?}",
+                     &self.name, &e
+                 );
+-                self.state = US::NotFound;
++                self.state = US::Other("state-read-failed".into());
+                 return Err(e);
+             }
+         };
+@@ -513,88 +543,64 @@ impl Unit {
+         self.refresh()
+     }
+ 
+-    fn wait_transition<F>(&mut self, wait_till: F, timeout: f64, exiting_timeout: f64)
++    fn wait_transition<F>(&mut self, wait_till: F, timeout: f64, exiting_timeout: f64) -> Result<()>
+     where
+         F: Fn(&US) -> bool,
+     {
+         let started_at = Instant::now();
++        let mut last_error = None;
+         loop {
+-            if let Ok(()) = self.refresh() {
+-                trace!(
+-                    "svc: {:?} waiting transitions ({:?})",
+-                    &self.name,
+-                    &self.state
+-                );
+-                match &self.state {
+-                    US::OtherActive(_) | US::Other(_) => {}
+-                    state if !wait_till(state) => {}
+-                    _ => return,
+-                }
++            match self.refresh() {
++                Ok(()) if wait_till(&self.state) => return Ok(()),
++                Ok(()) => {},
++                Err(error) => last_error = Some(error.to_string()),
+             }
+-
+-            let dur = Duration::from_secs_f64(match super::prog_exiting() {
+-                false => timeout,
+-                true => exiting_timeout,
++            let dur = Duration::from_secs_f64(if super::prog_exiting() {
++                exiting_timeout
++            } else {
++                timeout
+             });
+-            if Instant::now().duration_since(started_at) >= dur {
+-                trace!("svc: {:?} waiting transitions timed out", &self.name);
+-                return;
++            if started_at.elapsed() >= dur {
++                bail!("timed out waiting for {}: state={:?}, last_error={:?}",
++                      self.name, self.state, last_error);
+             }
+-
+             sleep(Duration::from_millis(100));
+         }
+     }
+ 
+     pub fn stop(&mut self) -> Result<bool> {
+-        debug!("svc: {:?} stopping ({:?})", &self.name, &self.state);
+-
+         self.refresh()?;
+-        match self.state {
+-            US::NotFound | US::Failed(_) => {
+-                debug!("svc: {:?} already stopped ({:?})", &self.name, &self.state);
+-                return Ok(true);
+-            }
+-            _ => {}
++        if self.state == US::NotFound {
++            return Ok(true);
+         }
+-
+-        self.sd_bus()
+-            .with(|s| s.borrow_mut().stop_unit(&self.name))?;
+-        // We're used from exit paths. Force a bit of wait so that we
+-        // can shut down gracefully in most cases.
++        // Even a failed/inactive service can have an automatic start queued.
++        // 'replace' is local to this unit's conflicting job, not ClearJobs().
++        self.sd_bus().with(|s| s.borrow_mut().stop_unit(&self.name))?;
+         self.wait_transition(
+-            |x| *x != US::Running,
++            stopped_state,
+             systemd_timeout(),
+             systemd_timeout() / 5.0,
+-        );
++        )?;
+         if !self.quiet {
+-            info!("svc: {:?} stopped ({:?})", &self.name, &self.state);
+-        }
+-        match self.state {
+-            US::NotFound | US::Failed(_) => Ok(true),
+-            _ => Ok(false),
++            info!("svc: {:?} stopped ({:?})", self.name, self.state);
+         }
++        Ok(true)
+     }
+ 
+     pub fn stop_and_reset(&mut self) -> Result<()> {
+         self.stop()?;
+         if let US::Failed(_) = self.state {
+-            self.sd_bus()
+-                .with(|s| s.borrow_mut().reset_failed_unit(&self.name))?;
+-            // We're used from exit paths. Force a bit of wait so that we
+-            // can shut down gracefully in most cases.
++            self.sd_bus().with(|s| s.borrow_mut().reset_failed_unit(&self.name))?;
+             self.wait_transition(
+-                |x| *x == US::NotFound,
++                |state| matches!(state, US::NotFound | US::Inactive(_)),
+                 systemd_timeout(),
+                 systemd_timeout() / 5.0,
+-            );
++            )?;
+         }
+-        match self.state {
+-            US::NotFound => Ok(()),
+-            _ => bail!(
+-                "invalid post-reset state {:?} for {}",
+-                self.state,
+-                &self.name
+-            ),
++        if matches!(self.state, US::NotFound | US::Inactive(_)) {
++            Ok(())
++        } else {
++            bail!("invalid post-reset state {:?} for {}", self.state, self.name)
+         }
+     }
+ 
+@@ -613,7 +619,7 @@ impl Unit {
+             },
+             systemd_timeout(),
+             0.0,
+-        );
++        )?;
+         if !self.quiet {
+             info!("svc: {:?} started ({:?})", &self.name, &self.state);
+         }
+@@ -737,7 +743,7 @@ impl TransientService {
+             },
+             systemd_timeout(),
+             0.0,
+-        );
++        )?;
+         if !self.unit.quiet {
+             info!(
+                 "svc: {:?} started ({:?})",
+@@ -751,9 +757,20 @@ impl TransientService {
+     }
+ 
+     pub fn start(&mut self) -> Result<()> {
++        self.unit.refresh()?;
++        if self.unit.state != US::NotFound && self.unit.props.boolean("Transient") != Some(true) {
++            bail!("refusing to replace non-transient unit {}", self.unit.name);
++        }
+         let resctl = self.unit.resctl.clone();
+         match self.unit.stop_and_reset() {
+             Ok(()) => {
++                if self.unit.state != US::NotFound {
++                    self.unit.wait_transition(
++                        |state| *state == US::NotFound,
++                        systemd_timeout(),
++                        systemd_timeout() / 5.0,
++                    )?;
++                }
+                 self.unit.resctl = resctl;
+                 match self.try_start() {
+                     Ok(true) => Ok(()),
+@@ -771,17 +788,16 @@ impl Drop for TransientService {
+         if self.keep {
+             return;
+         }
+-        for tries in (1..6).rev() {
+-            let action = match tries {
+-                0 => String::new(),
+-                v => format!(", retrying... ({} tries left)", v),
+-            };
++        for attempt in 0..3 {
+             match self.unit.stop_and_reset() {
+-                Ok(()) => {}
+-                Err(e) => warn!(
+-                    "Failed to stop {} on drop ({:?}){}",
+-                    &self.unit.name, &e, action
+-                ),
++                Ok(()) => break,
++                Err(error) => {
++                    warn!("Failed to stop {} on drop (attempt {}/3): {:?}",
++                          self.unit.name, attempt + 1, error);
++                    if attempt < 2 {
++                        sleep(Duration::from_millis(100 * (attempt + 1)));
++                    }
++                }
+             }
+         }
+     }
+@@ -856,3 +872,28 @@ mod tests {
+         info!("Dropped");
+     }
+ }
++
++#[cfg(test)]
++mod lifecycle_tests {
++    use super::*;
++
++    #[test]
++    fn stop_replaces_a_queued_restart() {
++        assert_eq!(STOP_JOB_MODE, "replace");
++    }
++
++    #[test]
++    fn active_and_transitioning_states_are_not_stopped() {
++        for state in [US::Running, US::Exited, US::OtherActive("reload".into()),
++                      US::Other("deactivating:stop-sigterm".into())] {
++            assert!(!stopped_state(&state));
++        }
++    }
++
++    #[test]
++    fn dead_failed_and_missing_are_stopped() {
++        for state in [US::NotFound, US::Inactive("dead".into()), US::Failed("failed".into())] {
++            assert!(stopped_state(&state));
++        }
++    }
++}
+diff --git a/resctl-bench/src/bench/storage.rs b/resctl-bench/src/bench/storage.rs
+index a2fa842..ca24df3 100644
+--- a/resctl-bench/src/bench/storage.rs
++++ b/resctl-bench/src/bench/storage.rs
+@@ -191,7 +191,12 @@ impl StorageJob {
+ 
+     fn process_retry(&mut self, rctx: &mut RunCtx) -> Result<bool> {
+         let mem = rctx.mem_info();
+-        let cur_mem_avail = mem.avail + self.mem_usage - mem.target;
++        let cur_mem_avail = mem.avail.checked_add(self.mem_usage)
++            .and_then(|value| value.checked_sub(mem.target))
++            .ok_or_else(|| anyhow!("storage: invalid memory estimate arithmetic; calibration stopped"))?;
++        if cur_mem_avail == 0 || cur_mem_avail > total_memory() as usize {
++            bail!("storage: available-memory estimate outside physical RAM; calibration stopped");
++        }
+         let consistent = (cur_mem_avail as f64 - self.prev_mem_avail as f64).abs()
+             < self.mem_avail_err_max * cur_mem_avail as f64;
+ 
 diff --git a/resctl-bench/src/main.rs b/resctl-bench/src/main.rs
 index 4264ff9..896dfcd 100644
 --- a/resctl-bench/src/main.rs

@@ -21,7 +21,7 @@ import sys
 import tempfile
 from typing import Any, Mapping
 
-FILES = ('biolatpcts.py', 'biolatpcts_wrapper.sh', 'iocost_coef_gen.py', 'sideloader.py')
+FILES = ('biolatpcts.py', 'biolatpcts_wrapper.sh', 'iocost_coef_gen.py', 'sideloader.py', 'memory-balloon.py')
 FLAGS = ('-fms-extensions', '-Wno-microsoft-anon-tag')
 
 
@@ -48,7 +48,7 @@ def read_contract(path: Path) -> dict[str, Any]:
             or not isinstance(data.get('bpf_measurement_program_sha256'), str)
             or not re.fullmatch(r'[0-9a-f]{64}', data['bpf_measurement_program_sha256'])):
         raise SupportError('Invalid runtime compatibility contract: ' + str(path))
-    if 'native_contract' in data and data['native_contract'] != 'resctl-iocost-lab-v2':
+    if 'native_contract' in data and data['native_contract'] != 'resctl-iocost-lab-v3':
         raise SupportError('Unrecognized compiled native repair contract')
     if not all(isinstance(v, str) and re.fullmatch(r'[0-9a-f]{64}', v) for v in data['files'].values()):
         raise SupportError('Invalid helper hash in runtime contract')

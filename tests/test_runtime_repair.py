@@ -148,7 +148,7 @@ class ExportContractTests(unittest.TestCase):
     def fake_agent(self, body):
         binary = self.base / 'bin/rd-agent'
         binary.parent.mkdir(exist_ok=True)
-        header = '#!/bin/sh\nif [ "$#" = 1 ] && [ "$1" = --runtime-contract ]; then echo resctl-iocost-lab-v2; exit 0; fi\n'
+        header = '#!/bin/sh\nif [ "$#" = 1 ] && [ "$1" = --runtime-contract ]; then echo resctl-iocost-lab-v3; exit 0; fi\n'
         binary.write_text(header + body + '\n')
         for name in ('resctl-bench', 'rd-hashd'):
             peer = binary.parent / name

@@ -1,3 +1,5 @@
+> Historical repair background. Current paired release instructions and native v3 requirements are in ../README.md and VALIDATION.md. Older markers/counts below are not the current runtime contract.
+
 # September 16 failure repair - IOCost Lab 2.1.1 / build kit 2.3.3
 
 For the follow-up `make package` executable-mode error and missing install

@@ -1,18 +1,9 @@
-# resctl-bench complete source release - build kit 2.4.0
+# resctl-bench complete source release - build kit 2.3.3
 
-**Current matched pair: IOCost Lab 2.5.0, build kit 2.4.0, native marker
-resctl-iocost-lab-v3.** Read docs/FAILURE-ANALYSIS-2.4.0.md for the supplied
-OOM/restart/TransactionIsDestructive failure. This release moves balloon lifetime
-and exact allocation back into rd-agent, checks its identity during calibration,
-uses checked systemd stop/replace operations and propagates errors cleanly.
-The Lab no longer repairs memory conditions while continuing a measurement.
-
-**Validation:** 261 build-kit software tests passed; these include labelled
-Cargo/C fixtures and do NOT establish Rust compilation. This delivery environment
-has no Rust compiler. The modified Rust workspace and its 34 mandatory native
-regressions are not executed here. No live disk/systemd/BPF calibration is claimed.
-Run the real native-validate gate before installation. Old compiled archives from
-the upload are deliberately excluded. See docs/VALIDATION.md.
+**Packaging follow-up:** the reported `biolatpcts.py` mode failure and missing
+install manifest are addressed in **docs/PACKAGING-REPAIR.md**. Extract this
+release into a new directory. Run `make package verify` successfully in the
+resctl-bench source tree before running its privileged install command.
 
 This is the complete supplied resctl workspace, with a reviewed **native source
 repair**, not another IOCost Lab wrapper or a substitute benchmark. The upstream
@@ -23,7 +14,7 @@ in `patches/` and `source.lock.json` and the native version retains its honest
 
 ## Retained repair for the original PATH / host-requirement / panic failures
 
-Read **docs/DELIVERY-REPAIR.md** for the historical IOCost Lab 2.1.1 procedure.
+Read **docs/DELIVERY-REPAIR.md** for the matched IOCost Lab 2.1.1 procedure.
 The previous repair added the native v2 contract, correct disabled-policy detection,
 fresh sysinfo snapshots and orderly ordinary-job/shutdown failure handling.
 The original output.zip showed a host-requirement rejection, not a Cargo
@@ -89,7 +80,7 @@ Do **not** run compilation with sudo. The default is the installed host Rust,
 compatible CPUs; that does not remove shared-library requirements.
 
 `make doctor` compiles small Rust/C/C++ probes and checks the actual selected
-host tools. `make package` compiles locked source, runs the 34 selected file-only,
+host tools. `make package` compiles locked source, runs the 27 selected file-only,
 JSON-parsing, I/O-policy and contract-parser Rust regressions, exports the compiled embedded helpers and verifies
 them byte-for-byte before and after stripping, runs CLI smoke checks, and only
 then publishes the runtime archive. Build tests do not run storage workloads,
@@ -138,7 +129,7 @@ vendored crates. `OFFLINE=1` requires those dependencies already available.
 this patched release so they cannot silently discard the repair. Rebase and
 revalidate a future source update explicitly.
 
-## Install and use with IOCost Lab 2.5.0
+## Install and use with IOCost Lab 2.x
 
 After `./BUILD.sh package verify` succeeds, install the actual new binaries:
 
@@ -147,22 +138,17 @@ sudo ./BUILD.sh install
 ```
 
 IOCost Lab 2.x uses the installed `resctl-bench`, `rd-agent` and `rd-hashd` on
-PATH. Set the Lab run.env TARGET_OUTPUT_DIR to an existing directory on the selected disk, then launch:
+PATH. Launch the Lab normally from a directory on the selected disk:
 
 ```sh
-cd /absolute/path/to/iocost-lab
-sudo ./RUN.sh doctor
-sudo ./RUN.sh
+cd /existing/directory/on/the/selected/disk
+sudo /absolute/path/to/iocost-lab/RUN.sh
 ```
 
 No runtime directory or scratch-directory prompt is needed. The Lab checks its
 own prerequisites, shows its maintenance plan, and handles workload/report
 placement and restoration. Output on the disk being calibrated is intentional;
 USB boot or a USB repository is not required.
-
-The Lab verifies the compiled v3 marker on all three installed programs, plus
-the five helper hashes. Restore any old tracked session before a fresh run; do
-not resume OOM-affected calibration. See the Lab README for the full procedure.
 
 The optional `RUN-IOCOST-LAB.sh --lab /path/to/iocost-lab` bridge is retained. It
 uses help-only interface detection: Lab 1.5.x receives the verified package via
@@ -184,7 +170,7 @@ Extract the generated runtime archive to a new directory. From its root:
 python3 -I -B runtime_support.py
 ```
 
-This exports and hashes the actual binary's five embedded helpers, as an
+This exports and hashes the actual binary's four embedded helpers, as an
 ordinary user. It cannot establish that your kernel accepts the BPF program.
 For a separate, explicitly requested real collector initialization test:
 
@@ -209,7 +195,7 @@ host logs, private user Git configuration, old binaries or build caches ship.
 `make lint test` runs the Python/source/packaging suite, including real Git,
 Make, C ELF, findmnt and Clang fixtures. Synthetic Cargo/BCC fixtures are clearly
 labelled and are not native Rust or live BPF tests. `make test-runtime` uses
-**real Cargo** on a build host to compile and execute the 34 selected Rust tests.
+**real Cargo** on a build host to compile and execute the 27 selected Rust tests.
 
 The delivery environment had no Rust/Cargo and could not fetch a toolchain;
 **this modified Rust workspace was not compiled here**. No live kernel BPF test,

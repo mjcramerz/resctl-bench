@@ -1,3 +1,5 @@
+> Historical repair background. Current paired release instructions and native v3 requirements are in ../README.md and VALIDATION.md. Older markers/counts below are not the current runtime contract.
+
 # Packaging follow-up: build kit 2.3.3 / IOCost Lab 2.1.1
 
 ## The two reported errors are one failed build followed by an install attempt

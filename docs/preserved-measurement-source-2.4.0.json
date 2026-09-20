@@ -1,0 +1,53 @@
+{
+  "comparison": "supplied resctl-bench.zip vs repaired source",
+  "files": {
+    "Cargo.lock": {
+      "unchanged": true,
+      "sha256": "fff9f4c6aed12b24be9533907308943b06027e534f8e9466dccd2904831d23a7"
+    },
+    "rd-agent/src/misc/biolatpcts.py": {
+      "unchanged": true,
+      "sha256": "d6b2d2cc47ce001c4b16aa0f8210868ccc860a4cf78b85da564c5fc1f1f3b433"
+    },
+    "rd-agent/src/misc/iocost_coef_gen.py": {
+      "unchanged": true,
+      "sha256": "459ad36aa658dd7c2d44aebb307a21f9b2399d73440012a2c1a70b9f4111ff91"
+    },
+    "resctl-bench/src/bench/iocost_params.rs": {
+      "unchanged": true,
+      "sha256": "a93ae8bd6dcc78efc3cca09c17c7a184648393d565285889c6c46e15e02c0e79"
+    },
+    "resctl-bench/src/bench/iocost_qos.rs": {
+      "unchanged": true,
+      "sha256": "0022cfec9412ea1a65f5ea3197a93396d645206f8d1551fe34fe37ee3bf723ae"
+    },
+    "resctl-bench/src/bench/iocost_tune.rs": {
+      "unchanged": true,
+      "sha256": "c4678c73f9b5cbd854353cc4b362eb9aa7bbb15af130d7b8cf4b9574708ed4f0"
+    },
+    "rd-hashd/src/main.rs": {
+      "unchanged": true,
+      "sha256": "091d6d7f46aa4d93d73fbe80b2fb630897452816bb6d67cd8fe1eef9e18019f0"
+    },
+    "rd-hashd/src/workqueue.rs": {
+      "unchanged": true,
+      "sha256": "a59f28e91df3e6b280b71c6210c79f01097600951e4858c303752439e9356409"
+    },
+    "rd-hashd/src/testfiles.rs": {
+      "unchanged": true,
+      "sha256": "c197fb7105a14f360df9a3c10f9e8725f5327caaab1178c2c0048629152a5354"
+    },
+    "rd-hashd/src/logger.rs": {
+      "unchanged": true,
+      "sha256": "5e248f8957c1be3ab94e56c4b76b3c5d15db5828a275669ee915feae774e825f"
+    },
+    "rd-hashd/src/bench.rs": {
+      "unchanged": true,
+      "sha256": "e4254fccd0b722448fa0c929bd3f0a5f15c5fc5d082107e0b2d26a03b39a4a53"
+    },
+    "rd-hashd/src/hasher.rs": {
+      "unchanged": true,
+      "sha256": "d2daf2ab2dcad3d885233282c988354cb0594b5f8565edf42005acd416397e62"
+    }
+  }
+}

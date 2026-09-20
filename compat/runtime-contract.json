@@ -9,11 +9,12 @@
     "biolatpcts.py": "d6b2d2cc47ce001c4b16aa0f8210868ccc860a4cf78b85da564c5fc1f1f3b433",
     "biolatpcts_wrapper.sh": "c715be393071e370768d1fcf2682fa47354bbb1d4d6aafbe19f233edd16cad65",
     "iocost_coef_gen.py": "459ad36aa658dd7c2d44aebb307a21f9b2399d73440012a2c1a70b9f4111ff91",
+    "memory-balloon.py": "95b66c8eaadb51073d14293ba0f6de55752893c9f13213e3d2ce84a4a8b8cf00",
     "sideloader.py": "15ffbe43fd829f48515b621fcc541649bddc24ed6d53ca384fdfe9385ec0feec"
   },
-  "id": "embedded-runtime-compat-v2",
+  "id": "embedded-runtime-compat-v3",
   "iocost_lab_1_5_helper_bytes_compatible": true,
-  "native_contract": "resctl-iocost-lab-v2",
+  "native_contract": "resctl-iocost-lab-v3",
   "result_schema": "resctl-bench-2.2.6",
   "schema": 1
 }

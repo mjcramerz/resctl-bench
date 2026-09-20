@@ -1,64 +1,68 @@
-# Validation scope - resctl-bench build kit 2.3.3
+# resctl-bench build kit 2.4.0 validation - 2026-09-20
 
-## Current software results
+| Executed check | Result |
+| --- | --- |
+| Full root software suite | 261 passed; 38.462 s |
+| Source tar extracted as uid 65534 with umask 077 | 261 passed; 39.823 s; 0 skipped |
+| Source integrity | Complete workspace, Cargo.lock, patch, source manifest and recovery hash passed |
+| Syntax/whitespace | 19 builder/test Python files passed |
+| Exact native balloon Python tests | 23 passed, including real small touched mappings and notification sockets |
+| Paired Lab | 1,064 passed as root; 1,058 passed plus 6 root-only skips as ordinary user |
+| Actual native build | Source verification passed, then missing rustc; exit 2 |
+| Rust regression/hardware benchmark | NOT executed |
 
-The full root software suite ran **238 tests, all passed**. The same suite
-ran again as an ordinary user after extracting the source archive with
-**umask 077**, with **238 passed, 0 skipped, zero failures/errors**.
+Current logs are in validation-2.4.0/, with convenient copies at test-results.txt,
+test-results-unprivileged-077.txt and native-check-attempt.txt.
 
-Current logs: **test-results.txt** and **test-results-unprivileged-077.txt**.
-Machine-readable scope: **validation.json**. These logs are not copied passes
-from the previous delivery; the previous records remain under **history/**.
+## What the executed tests do and do not establish
 
-## The reported packaging failure was reproduced and tested
+Real Python allocations, local Unix notification sockets, harmless child processes,
+atomic filesystem transactions, Git, Make, C/ELF packaging fixtures, command-line
+parsing and failure injection were exercised. The build tests use explicitly
+labelled synthetic Cargo doubles/C binaries for pipeline scenarios. None of those
+passes is represented as compiling the actual Rust workspace or calibrating a disk.
+Memory-control tests use temporary files, not the host's real sysctls. Legacy swap
+restoration fixtures explicitly select an old policy; new production policy allows
+zero in-run growth. No real swapfile was activated by these tests.
 
-**mode-reproduction.json** records ordinary-user extraction of the actual
-previous 2.3.2 tarball with umasks 022, 027 and 077. The 027/077 extractions
-produce the exact reported `biolatpcts.py` error. With the corrected validator,
-all three pass source verification without changing source modes. A package
-attempt then reaches the missing-Rust prerequisite instead of the mode error.
-The missing manifest remains a failed build, never fabricated installation
-success. The new install diagnostic describes the required build-first order.
+The original 2.4 Lab suite had 1,087 tests. Replacing its 75 adaptive-repair tests
+with 24 fail-closed tests, adding 26 memory-policy transaction tests and two final
+verdict/resume tests produces 1,064 current tests. The old adaptive expectations
+are deliberately not retained as current behavior. Historical source/tests/docs
+remain labelled under history/. The buildkit adds 23 exact-balloon Python tests
+to its original 238 software tests, producing 261.
 
-**permission-regressions.txt** records 20 focused Python/filesystem tests.
-The full build-kit suite includes actual GNU tar/Make/staging/checksum/installer
-pipelines under all three umasks, with a real synthetic C ELF and a labelled
-Cargo double. Those pipeline tests also check exact exported helper modes,
-installed executable and newly created directory modes, retention of private
-existing directories, and refusal to install after archive corruption.
-They are NOT a real Rust or resctl benchmark build.
+## Native/hardware boundary: NOT executed
 
-The Lab's two added regressions inspect synthetic installed commands under
-restrictive umasks, verify that private source assets are not chmodded, and
-continue rejecting mixed native repair markers. Existing report, model/QoS,
-HWDB/deployment and host-recovery tests remain present. Fixture measurements
-are labelled test data, not calibrations of the user's disk.
+The modified Rust workspace was not compiled. The real ordinary-user
+native-validate attempt verifies the complete patched source and then exits 2 at
+`Host rustc not found`, before compiling a crate. The attempt uses an explicit
+unsupported-Debian override only because this container is Debian 13 rather than
+the retained Forky build target. No automatic compiler installation or package
+change was performed. The separate installed-native test attempt ran zero tests:
+resctl-bench was not installed. These are recorded unavailable gates, not passes.
 
-## Source integration and preservation
+The 34 selected Rust regressions (10 helper, 8 storage-resolution, 6 IO-policy,
+3 runtime-contract, 3 lifecycle and 4 balloon-identity tests) are mandatory in the
+real package gate on the build host; they have NOT run in this delivery container.
+No live systemd transient-unit lifecycle, BPF attachment, hardware coefficient/QoS
+tuning, reboot, real swap activation or measured-profile deployment was executed.
+No successful user-host outcome is claimed. A host-native compile failure remains
+possible until that gate is actually run; do not treat source inspection as proof.
 
-**pair-preservation.json** records byte-for-byte retention of all 163 native
-source files, Cargo.lock, the reviewed patch, source lock/manifests and recovery
-archive from 2.3.2. It also checks all four Lab/native helper hashes and the
-shared `resctl-iocost-lab-v2` marker. No dependency, measurement program,
-coefficient generator, native result schema or host-requirement bypass was
-introduced by this packaging repair.
+## Source and archive provenance
 
-## Native/hardware limits
+All production/test/fixture sources compared against the ordinary-user tested
+copies are byte-identical; the file counts are in tested-source-comparison*.json.
+Only documentation/evidence was added afterward. The full native workspace,
+real base Git object/history needed for version identity, aggregate reviewed patch,
+source lock/manifest, Cargo.lock and a hash-pinned local recovery archive are
+included. The working tree honestly remains dirty relative to the original base.
+The BPF collector, coefficient generator and IOCost stage sources are unchanged
+from the supplied ZIP; preserved-measurement-source*.json records their hashes.
 
-This container has no rustc, cargo or rustdoc, and cannot resolve the compiler/
-package download host. **native-check-attempt.txt** is the actual ordinary-user
-`native-validate` attempt: source verification passes, then doctor exits at
-**Host rustc not found**, before any crate compiles. The explicit unsupported-
-Debian override is used only because this validation container is Debian 13,
-not the build kit's target Debian Forky environment.
-
-Native Rust compilation, the 27 selected native Rust tests, BPF attachment,
-normal rd-agent startup, real disk calibration, swap migration, service
-stop/start, reboot and measured HWDB deployment were NOT performed. Native
-compile/runtime success is not claimed. The CI workflow was not run here.
-
-This is complete project source, not a binary package and not a vendored
-third-party crate distribution. The first real build needs the documented
-host toolchain/development dependencies plus Cargo registry/cache access.
-Follow **PACKAGING-REPAIR.md** for build/install order and **DELIVERY-REPAIR.md**
-for host preparation and the measured report/deployment workflow.
+Old compiled archives, build caches, private toolchain paths and the user's support
+bundle are excluded. Third-party Cargo dependencies are locked but not vendored;
+normal cache/network access is needed for the first native build. `make source-dist`
+can vendor dependencies on the provisioned host. Checksums are regenerated for
+this delivery. Historical test logs are not current-result claims.

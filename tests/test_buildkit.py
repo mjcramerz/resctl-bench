@@ -193,9 +193,9 @@ elif command == 'update':
     if os.environ.get('FIXTURE_UPDATE_TAMPER') == '1':
         (source/'README.md').write_text('illegal resolver mutation')
 elif command in ('check','test','fetch'):
-    if command == 'test' and any(x in args for x in ('misc::support_tests::', 'storage_info::source_resolution_tests::', 'slices::io_policy_tests::', 'runtime_contract_tests::')):
+    if command == 'test' and any(x in args for x in ('misc::support_tests::', 'storage_info::source_resolution_tests::', 'slices::io_policy_tests::', 'runtime_contract_tests::', 'systemd::lifecycle_tests::', 'side::balloon_health_tests::')):
         print('SYNTHETIC Cargo fixture; no Rust tests executed')
-        n = next(n for f,n in [('misc::support_tests::',10), ('storage_info::source_resolution_tests::',8), ('slices::io_policy_tests::',6), ('runtime_contract_tests::',3)] if f in args)
+        n = next(n for f,n in [('misc::support_tests::',10), ('storage_info::source_resolution_tests::',8), ('slices::io_policy_tests::',6), ('runtime_contract_tests::',3), ('systemd::lifecycle_tests::',3), ('side::balloon_health_tests::',4)] if f in args)
         print(f'test result: ok. {n} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;')
 else:
     sys.exit('unexpected cargo command: '+repr(args))
@@ -223,7 +223,7 @@ class PipelineTests(unittest.TestCase):
 struct asset { const char *name; const char *body; };
 static const struct asset assets[] = {''' + declarations + '''};
 int main(int argc, char **argv) {
-  if (argc == 2 && strcmp(argv[1], "--runtime-contract") == 0) { puts("resctl-iocost-lab-v2"); return 0; }
+  if (argc == 2 && strcmp(argv[1], "--runtime-contract") == 0) { puts("resctl-iocost-lab-v3"); return 0; }
   if (argc == 3 && strcmp(argv[1], "--export-support") == 0) {
     if (mkdir(argv[2], 0700) != 0) return 2;
     for (unsigned int i = 0; i < sizeof(assets)/sizeof(assets[0]); i++) {

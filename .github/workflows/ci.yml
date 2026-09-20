@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           make snapshot-dist
-          archive="$PWD/dist/resctl-bench-2.2.6-complete-source-2.3.3.tar.gz"
+          archive="$PWD/dist/resctl-bench-2.2.6-complete-source-2.4.0.tar.gz"
           for mask in 022 027 077; do
             target="/tmp/kit-release-check-$mask"
             mkdir "$target"

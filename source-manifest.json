@@ -121,7 +121,7 @@
   },
   "rd-agent/README.md": {
     "mode": 420,
-    "sha256": "b6f724aceb3de5b391766fcb423a76da76344baea103802a4ed71dd119594696"
+    "sha256": "0af0e2620bf9677404ea90733a73d5950e40d332dea175968b8688e6e0f9b285"
   },
   "rd-agent/src/bandit.rs": {
     "mode": 420,
@@ -137,7 +137,7 @@
   },
   "rd-agent/src/cmd.rs": {
     "mode": 420,
-    "sha256": "df34f2b4bbf0722083c7430692450a8d8a0d6f00e67109c94fb10d8aeace861d"
+    "sha256": "dd94e67e31240e5b8aecc7455c14199b165dd669a7f2fd25fbb62a9f6a07e729"
   },
   "rd-agent/src/hashd.rs": {
     "mode": 420,
@@ -145,11 +145,11 @@
   },
   "rd-agent/src/main.rs": {
     "mode": 420,
-    "sha256": "cbfc8a4e501318c99bc18508325d7f83d7ff0735f4680324b9af7a01e4cac1ae"
+    "sha256": "5ec58a4cafaea9fcadb5e8b59cf1c52a88855ea8be0243a3ec79096f284ac1a4"
   },
   "rd-agent/src/misc.rs": {
     "mode": 420,
-    "sha256": "af616b1809fa238571623ffc41b37190b28987eb722cd3dfdab224a0de4b67a5"
+    "sha256": "3810f2a086d7471b90326e290a76ce190c0e4835cf8358ed98180244cb769d2c"
   },
   "rd-agent/src/misc/biolatpcts.py": {
     "mode": 493,
@@ -162,6 +162,10 @@
   "rd-agent/src/misc/iocost_coef_gen.py": {
     "mode": 493,
     "sha256": "459ad36aa658dd7c2d44aebb307a21f9b2399d73440012a2c1a70b9f4111ff91"
+  },
+  "rd-agent/src/misc/memory-balloon.py": {
+    "mode": 493,
+    "sha256": "95b66c8eaadb51073d14293ba0f6de55752893c9f13213e3d2ce84a4a8b8cf00"
   },
   "rd-agent/src/misc/sideloader.py": {
     "mode": 493,
@@ -177,7 +181,7 @@
   },
   "rd-agent/src/side.rs": {
     "mode": 420,
-    "sha256": "0d0f6678989eea9e6492d0d48f3ea1b822decc3d05650ef0888c2c20843ba9bc"
+    "sha256": "9a5949a16725d645e8e3391ae9097ff7feca1b799f956fa4c8e8c5d4fe25fac0"
   },
   "rd-agent/src/side/build-linux.sh": {
     "mode": 493,
@@ -194,10 +198,6 @@
   "rd-agent/src/side/mem-hog.sh": {
     "mode": 493,
     "sha256": "7b471c9116f6f05ec89618f1cad4c639d18ca31e7cf752ba56443040e3b00099"
-  },
-  "rd-agent/src/side/memory-balloon.py": {
-    "mode": 493,
-    "sha256": "8e5768f26da4ef4e91b27c8ae0ff6c4808dbdb30b5227a2f67ea2b95ad2b1967"
   },
   "rd-agent/src/side/read-bomb.py": {
     "mode": 493,
@@ -309,7 +309,7 @@
   },
   "rd-util/src/lib.rs": {
     "mode": 420,
-    "sha256": "689ce71c4a96416e2c6bc24f321e77f9c789c00e5ed24d22fa460f0a8c5495a4"
+    "sha256": "b6740bf1e0b52d32d34b52f8c1c524c45db78b44728eda37bc12fe74bf781c73"
   },
   "rd-util/src/storage_info.rs": {
     "mode": 420,
@@ -317,7 +317,7 @@
   },
   "rd-util/src/systemd.rs": {
     "mode": 420,
-    "sha256": "e526578c3fc7db029967d4ea6fc2a92728884fa48576561cb634a802475fded2"
+    "sha256": "629cedb137f4764b01073ee641f6ca8235e9817909967216fedc6b89647edd7f"
   },
   "resctl-bench-intf/Cargo.toml": {
     "mode": 420,
@@ -457,7 +457,7 @@
   },
   "resctl-bench/src/bench/storage.rs": {
     "mode": 420,
-    "sha256": "9fbab0c6449366424e29b2b36f43386c5a1a3752970a82e841ef78b78c1dcbe8"
+    "sha256": "dd09d0ebab15803034d1f80961cb4d53d177e286eae84451758c964bb930bbb5"
   },
   "resctl-bench/src/iocost.rs": {
     "mode": 420,

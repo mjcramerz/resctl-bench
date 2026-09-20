@@ -5,20 +5,20 @@
   "patchset": {
     "base_manifest": "patches/base-source-manifest.json",
     "base_manifest_sha256": "b18d09430f157b43c77393109558a52709c42455b6404c2251adc830aac30c92",
-    "id": "embedded-runtime-compat-v2",
+    "id": "embedded-runtime-compat-v3",
     "path": "patches/0001-embedded-runtime-compat.patch",
     "runtime_contract": "compat/runtime-contract.json",
-    "runtime_contract_sha256": "0586f3edfdd28be98e8b58fb2850be9f37d5988ff36d9c0720db2344b6a1ff10",
-    "sha256": "ad83790dd3794c7f1a087e7656d224d0b65869cb4a66d286c2069db33ef81739"
+    "runtime_contract_sha256": "3739dbb2fd0759b86a13878d2a7422a001f70246c9a19e827c08b9adc21a0b31",
+    "sha256": "770c7fe9840fd8eeb3d4312d02d94bb5817e5d056a73918e5f04792b1e98ae25"
   },
   "recovery": {
     "format": "complete-source-tar-gzip",
     "path": "source-cache/upstream.tar.gz",
     "schema": 1,
-    "sha256": "74d1d70d15262c3d2cdadd62153940e7a35a37f91d009a84bd3bf7fe067e9da4"
+    "sha256": "8080283e99cd3c42087dab921ddb7251660095b9e678e069c717bcafc600a0a9"
   },
   "requested_ref": "main",
   "schema": 2,
-  "source_manifest_sha256": "8444a5edf6d45c15599adb7008904a1a444f14775781375520f698904917d55c",
+  "source_manifest_sha256": "921001d7f06fac1634b539d9de05701f43869ac3945ff8c10e680d94adcbffbe",
   "url": "https://github.com/facebookexperimental/resctl-demo.git"
 }
