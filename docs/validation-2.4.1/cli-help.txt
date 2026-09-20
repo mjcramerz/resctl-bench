@@ -1,0 +1,37 @@
+usage: iocost_report.py [-h] [--version]
+                        {config,menu,doctor,host-prepare,continue,list,dependencies,preflight,run,report,hwdb,install,verify,restore} ...
+
+IOCost Lab: run.env selects TARGET_OUTPUT_DIR; all managed files go to its
+unique session directories. External/read-only code media supported. No
+scratch-directory input.
+
+positional arguments:
+  {config,menu,doctor,host-prepare,continue,list,dependencies,preflight,run,report,hwdb,install,verify,restore}
+    config              Show effective allowlisted run.env settings without
+                        writing output or probing a disk
+    menu                Show interactive actions (the default with no
+                        arguments)
+    doctor              Verify installed commands and compiled helpers; no
+                        device, BPF or swap changes
+    host-prepare        Review D-Bus hostcritical drop-ins; explicit apply
+                        requires a subsequent manual reboot
+    continue            Continue a saved host-preparation action after reboot;
+                        fresh interactive consent
+    list                List devices without benchmarking or changing host
+                        settings
+    dependencies        Check Debian runtime and full-mode development
+                        dependencies; no writes without --install
+    preflight           Inspect prerequisites
+    run                 Select a disk and run write-heavy calibration
+    report              Regenerate reports and deployment files from a saved
+                        run
+    hwdb                Export measured HWDB plus its required companion
+                        files; no host writes
+    install             Install a saved validated report's deployment
+    verify              Check installed IOCost values against a matched device
+    restore             Explicit best-effort recovery from a saved benchmark
+                        snapshot
+
+options:
+  -h, --help            show this help message and exit
+  --version             show program's version number and exit

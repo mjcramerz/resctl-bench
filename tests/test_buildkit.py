@@ -279,7 +279,12 @@ int main(int argc, char **argv) {
             (fakebin / tool).chmod(0o755)
         self.log = base / "commands.jsonl"
         self.log.touch()
+        # Default pipeline fixtures clone only their temporary local repository.
+        # Pin that fixture mode rather than inheriting a caller's OFFLINE=1:
+        # explicit offline tests still set Config.offline or Make OFFLINE=1.
+        # This does not modify production offline policy or enable network use.
         self.env = patch.dict(os.environ, {"PATH": str(fakebin) + ":" + os.environ["PATH"],
+                               "OFFLINE": "0",
                                "ALLOW_ROOT_BUILD": "1", "ALLOW_UNSUPPORTED_DEBIAN": "1", "FIXTURE_ELF": str(self.elf),
                                "FIXTURE_LOG": str(self.log), "CARGO_HOME": str(base / "cargo-home")})
         self.env.start()

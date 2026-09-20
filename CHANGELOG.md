@@ -1,3 +1,12 @@
+# 2.4.1 - hermetic offline Git recovery tests
+
+- Isolate local-source pipeline fixtures from inherited OFFLINE; retain explicit offline cases and production policy.
+
+- Exclude outer .git only when copying test fixtures; preserve upstream/.git.
+- Isolate test Git commands from inherited routing, config, signing and hooks.
+- Exercise real committed checkouts and worktrees; do not use --allow-empty.
+- Pair with IOCost Lab 2.6.0; no native workspace/helper/lock changes.
+
 # 2.4.0 - Native v3 lifecycle, exact allocation and matched Lab 2.5.0
 
 See README.md, docs/VALIDATION.md and the current failure-analysis document.

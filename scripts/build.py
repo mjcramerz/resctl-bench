@@ -60,14 +60,14 @@ host_rust = _load_helper("host_rust")
 runtime_support = _load_helper("runtime_support")
 source_archive = _load_helper("source_archive")
 
-VERSION = "2.4.0"
+VERSION = "2.4.1"
 ROOT = Path(__file__).resolve().parents[1]
 GIB = 1024**3
 BASE_BINS = ("resctl-bench", "rd-agent", "rd-hashd")
 KIT_ITEMS = ("Makefile", "README.md", "LICENSE", "NOTICE.md", ".gitignore",
              ".editorconfig", "config.mk.example", "scripts", "tests", "docs",
              "packages", ".github", "CHANGELOG.md", "compat", "patches", "RUN-IOCOST-LAB.sh", "BUILD.sh")
-HELP = """resctl-bench-buildkit 2.4.0 (Debian Forky, native amd64/arm64 GNU/Linux)
+HELP = """resctl-bench-buildkit 2.4.1 (Debian Forky, native amd64/arm64 GNU/Linux)
 
   make                  Same as make package (host Rust; locked source)
   make package          Build locked sources with host Rust; no APT or toolchain changes

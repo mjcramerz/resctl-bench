@@ -1,0 +1,19 @@
+test_git_checkout_without_ignored_upstream_recovers (old_source_recovery.OfflineRecoveryTests.test_git_checkout_without_ignored_upstream_recovers) ... FAIL
+
+======================================================================
+FAIL: test_git_checkout_without_ignored_upstream_recovers (old_source_recovery.OfflineRecoveryTests.test_git_checkout_without_ignored_upstream_recovers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/revision-work/original_test_source_recovery.py", line 206, in test_git_checkout_without_ignored_upstream_recovers
+    execute(['git', 'commit', '--quiet', '-m', 'Complete source distribution'], self.root)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/data/revision-work/original_test_source_recovery.py", line 34, in execute
+    raise AssertionError(result.stdout + result.stderr)
+AssertionError: On branch mcr/main
+nothing to commit, working tree clean
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.303s
+
+FAILED (failures=1)

@@ -1,0 +1,22 @@
+/usr/bin/python3 -I -B integration/installed_contract.py
+E
+======================================================================
+ERROR: setUpClass (__main__.NativeContract)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/revision-work/ordinary-user/iocost-lab/integration/installed_contract.py", line 32, in setUpClass
+    cls.runtime = cli.prepare_runtime(cls.out, None)
+                  ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/mnt/data/revision-work/ordinary-user/iocost-lab/lib/runtime.py", line 294, in prepare_runtime
+    runtime = discover_runtime(bin_dir)
+  File "/mnt/data/revision-work/ordinary-user/iocost-lab/lib/runtime.py", line 180, in discover_runtime
+    raise LabError(f'Installed command {name!r} was not found on the effective PATH or standard system install paths. '
+    ...<2 lines>...
+                   'For a trusted nonstandard installation, use --bin-dir /absolute/installed/bin.')
+core.LabError: Installed command 'resctl-bench' was not found on the effective PATH or standard system install paths. The Lab never extracts/downloads a runtime. Check `sudo sh -c 'command -v resctl-bench rd-agent rd-hashd'`; sudo may use a different PATH. For a trusted nonstandard installation, use --bin-dir /absolute/installed/bin.
+
+----------------------------------------------------------------------
+Ran 0 tests in 0.001s
+
+FAILED (errors=1)
+make: *** [Makefile:16: check-installed] Error 5

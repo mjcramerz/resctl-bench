@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "native_workspace_changed": false,
+  "compared_native_files": 163,
+  "differences": [],
+  "native_git_metadata_comparison": "Excluded: mutable Git stat cache is not production source",
+  "pinned_assets": [
+    {
+      "path": "source.lock.json",
+      "identical": true,
+      "sha256": "517174a4847f53b83b3bae54077d5834b1366e691bfeb740fe7b79f3d6c249bd"
+    },
+    {
+      "path": "source-manifest.json",
+      "identical": true,
+      "sha256": "921001d7f06fac1634b539d9de05701f43869ac3945ff8c10e680d94adcbffbe"
+    },
+    {
+      "path": "source-cache/upstream.tar.gz",
+      "identical": true,
+      "sha256": "8080283e99cd3c42087dab921ddb7251660095b9e678e069c717bcafc600a0a9"
+    }
+  ],
+  "lab_runtime_helper_contract_module_identical": true,
+  "native_files_on_disk": 163
+}

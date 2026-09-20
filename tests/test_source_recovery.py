@@ -23,7 +23,18 @@ archive_module = bk.source_archive
 
 
 def execute(args, cwd, *, success=True):
-    env = {**os.environ, 'OFFLINE': '1', 'GIT_TERMINAL_PROMPT': '0',
+    # Never let an enclosing checkout, user signing policy, hooks or Git
+    # configuration redirect a real offline fixture command. This environment
+    # is also inherited by BUILD.sh and its Git subprocesses.
+    inherited = {key: value for key, value in os.environ.items()
+                 if not key.startswith('GIT_')}
+    env = {**inherited, 'OFFLINE': '1', 'GIT_TERMINAL_PROMPT': '0',
+           'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': os.devnull,
+           'GIT_CONFIG_SYSTEM': os.devnull,
+           'GIT_CONFIG_COUNT': '3',
+           'GIT_CONFIG_KEY_0': 'core.hooksPath', 'GIT_CONFIG_VALUE_0': os.devnull,
+           'GIT_CONFIG_KEY_1': 'commit.gpgSign', 'GIT_CONFIG_VALUE_1': 'false',
+           'GIT_CONFIG_KEY_2': 'init.templateDir', 'GIT_CONFIG_VALUE_2': '',
            'http_proxy': 'http://127.0.0.1:1', 'https_proxy': 'http://127.0.0.1:1',
            'GIT_AUTHOR_NAME': 'Source recovery test', 'GIT_COMMITTER_NAME': 'Source recovery test',
            'GIT_AUTHOR_EMAIL': 'test@example.invalid', 'GIT_COMMITTER_EMAIL': 'test@example.invalid',
@@ -35,14 +46,32 @@ def execute(args, cwd, *, success=True):
     return result
 
 
+def copy_fixture_repository(source: Path, destination: Path) -> None:
+    """Copy release content, not the developer's outer checkout metadata.
+
+    A root .git may be a directory (clone) or a file (linked worktree).
+    upstream/.git is intentional locked recovery data and MUST be retained.
+    """
+    source = source.resolve()
+    ordinary_ignored = shutil.ignore_patterns(
+        '.work', 'dist', '__pycache__', '.buildkit.lock', 'source-recovery-backups')
+
+    def ignore(directory, names):
+        excluded = set(ordinary_ignored(directory, names))
+        if Path(directory).resolve() == source:
+            excluded.add('.git')
+        return excluded
+
+    shutil.copytree(source, destination, ignore=ignore)
+
+
 class OfflineRecoveryTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix='source recovery ')
         self.addCleanup(self.tmp.cleanup)
         self.base = Path(self.tmp.name)
         self.root = self.base / 'repository with spaces'
-        shutil.copytree(ROOT, self.root, ignore=shutil.ignore_patterns(
-            '.work', 'dist', '__pycache__', '.buildkit.lock', 'source-recovery-backups'))
+        copy_fixture_repository(ROOT, self.root)
         self.builder = bk.Builder(self.root, bk.Config.from_env({'OFFLINE': '1'}))
         self.source = self.root / 'upstream'
 
@@ -201,7 +230,8 @@ class OfflineRecoveryTests(unittest.TestCase):
             self.builder.fetch(update=True)
 
     def test_git_checkout_without_ignored_upstream_recovers(self):
-        execute(['git', 'init', '--quiet'], self.root)
+        self.assertFalse((self.root / '.git').exists(), 'Fixture inherited outer Git metadata')
+        execute(['git', 'init', '--quiet', '--initial-branch=source-recovery-fixture'], self.root)
         execute(['git', 'add', '.'], self.root)
         execute(['git', 'commit', '--quiet', '-m', 'Complete source distribution'], self.root)
         tracked = execute(['git', 'ls-files'], self.root).stdout.splitlines()
@@ -240,6 +270,94 @@ class OfflineRecoveryTests(unittest.TestCase):
         execute([repo / 'BUILD.sh', 'fetch', 'verify-source', 'OFFLINE=1'], self.base)
         result = execute(['sha256sum', '-c', 'SHA256SUMS'], repo)
         self.assertIn('upstream/.git/index: OK', result.stdout)
+
+
+class GitFixtureIsolationTests(unittest.TestCase):
+    """Reproduce committed checkouts/worktrees and hostile ambient Git settings."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='git isolation ')
+        self.addCleanup(self.tmp.cleanup)
+        self.base = Path(self.tmp.name)
+        self.source = self.base / 'source'
+        self.source.mkdir()
+        (self.source / '.gitignore').write_text('upstream/\n')
+        (self.source / 'tracked.txt').write_text('release content\n')
+        nested = self.source / 'upstream/.git'
+        nested.mkdir(parents=True)
+        (nested / 'HEAD').write_text('ref: refs/heads/locked\n')
+        self.destination = self.base / 'isolated copy'
+
+    def init_committed(self, path):
+        execute(['git', 'init', '--quiet'], path)
+        execute(['git', 'add', '.'], path)
+        execute(['git', 'commit', '--quiet', '-m', 'fixture'], path)
+
+    def test_committed_clean_outer_checkout_is_not_copied(self):
+        self.init_committed(self.source)
+        original = execute(['git', 'rev-parse', 'HEAD'], self.source).stdout
+        copy_fixture_repository(self.source, self.destination)
+        self.assertFalse((self.destination / '.git').exists())
+        self.assertTrue((self.destination / 'upstream/.git/HEAD').is_file())
+        self.init_committed(self.destination)  # non-empty FIRST commit, not --allow-empty
+        self.assertEqual(execute(['git', 'rev-list', '--count', 'HEAD'], self.destination).stdout.strip(), '1')
+        self.assertEqual(execute(['git', 'rev-parse', 'HEAD'], self.source).stdout, original)
+        self.assertEqual(execute(['git', 'status', '--porcelain'], self.source).stdout, '')
+
+    def test_linked_worktree_dotgit_file_is_not_copied(self):
+        self.init_committed(self.source)
+        worktree = self.base / 'linked worktree'
+        execute(['git', 'worktree', 'add', '--quiet', '-b', 'fixture-linked', worktree], self.source)
+        self.assertTrue((worktree / '.git').is_file())
+        copy_fixture_repository(worktree, self.destination)
+        self.assertFalse((self.destination / '.git').exists())
+        self.init_committed(self.destination)
+        self.assertTrue((worktree / '.git').is_file())
+        self.assertEqual(execute(['git', 'status', '--porcelain'], worktree).stdout, '')
+
+    def test_root_dotgit_symlink_is_not_followed(self):
+        outside = self.base / 'private metadata'
+        outside.mkdir()
+        (outside / 'private').write_text('must not copy')
+        (self.source / '.git').symlink_to(outside, target_is_directory=True)
+        copy_fixture_repository(self.source, self.destination)
+        self.assertFalse((self.destination / '.git').exists())
+        self.assertTrue((self.destination / 'upstream/.git/HEAD').is_file())
+        self.assertEqual((outside / 'private').read_text(), 'must not copy')
+
+    def test_git_environment_cannot_redirect_fixture_commands(self):
+        self.init_committed(self.source)
+        index = (self.source / '.git/index').read_bytes()
+        copy_fixture_repository(self.source, self.destination)
+        with patch.dict(os.environ, {
+            'GIT_DIR': str(self.source / '.git'), 'GIT_WORK_TREE': str(self.source),
+            'GIT_COMMON_DIR': str(self.source / '.git'),
+            'GIT_INDEX_FILE': str(self.source / '.git/index'),
+            'GIT_CONFIG_COUNT': '1', 'GIT_CONFIG_KEY_0': 'core.bare', 'GIT_CONFIG_VALUE_0': 'true',
+            'GIT_OBJECT_DIRECTORY': str(self.source / '.git/objects'),
+            'GIT_ALTERNATE_OBJECT_DIRECTORIES': '/nonexistent',
+        }):
+            self.init_committed(self.destination)
+            actual = execute(['git', 'rev-parse', '--show-toplevel'], self.destination)
+        self.assertEqual(Path(actual.stdout.strip()), self.destination)
+        self.assertEqual((self.source / '.git/index').read_bytes(), index)
+
+    def test_user_hooks_templates_and_signing_cannot_break_commit(self):
+        home = self.base / 'fake home'
+        home.mkdir()
+        templates = home / 'templates/hooks'
+        templates.mkdir(parents=True)
+        hook = templates / 'pre-commit'
+        hook.write_text('#!/bin/sh\nexit 93\n')
+        hook.chmod(0o755)
+        (home / '.gitconfig').write_text(
+            '[commit]\n gpgSign = true\n[gpg]\n program = /does/not/exist\n'
+            '[core]\n hooksPath = "' + str(templates) + '"\n'
+            '[init]\n templateDir = "' + str(templates.parent) + '"\n')
+        with patch.dict(os.environ, {'HOME': str(home), 'XDG_CONFIG_HOME': str(home),
+                                     'GIT_TEMPLATE_DIR': str(templates.parent)}):
+            self.init_committed(self.source)
+        self.assertEqual(execute(['git', 'rev-list', '--count', 'HEAD'], self.source).stdout.strip(), '1')
+        self.assertFalse((self.source / '.git/hooks/pre-commit').exists())
 
 
 class RecoveryArchiveSafetyTests(unittest.TestCase):

@@ -1,68 +1,71 @@
-# resctl-bench build kit 2.4.0 validation - 2026-09-20
+# resctl-bench buildkit 2.4.1 validation - 2026-09-20
 
 | Executed check | Result |
 | --- | --- |
-| Full root software suite | 261 passed; 38.462 s |
-| Source tar extracted as uid 65534 with umask 077 | 261 passed; 39.823 s; 0 skipped |
-| Source integrity | Complete workspace, Cargo.lock, patch, source manifest and recovery hash passed |
-| Syntax/whitespace | 19 builder/test Python files passed |
-| Exact native balloon Python tests | 23 passed, including real small touched mappings and notification sockets |
-| Paired Lab | 1,064 passed as root; 1,058 passed plus 6 root-only skips as ordinary user |
-| Actual native build | Source verification passed, then missing rustc; exit 2 |
-| Rust regression/hardware benchmark | NOT executed |
+| Root `./BUILD.sh lint test`, clean committed outer checkout | 266 passed; 57.69 s |
+| Ordinary user, tar extraction, umask 077 | 266 passed; 57.884 s |
+| Original reported test on old implementation | Exact clean-tree commit failure reproduced |
+| Five new Git isolation regressions | Passed, included in full suites |
+| Paired Lab suite | 1,100 root passes; 1,094 user passes plus 6 skips |
+| Actual native build / installed-native tests | Unavailable, not passed |
 
-Current logs are in validation-2.4.0/, with convenient copies at test-results.txt,
-test-results-unprivileged-077.txt and native-check-attempt.txt.
+Current logs and JSON are in `validation-2.4.1/`. The old regression reproduction
+is deliberately a failing historical test and is labelled as such; it is not
+a failure in the repaired suite. The root full suite ran from a real committed
+`mcr/main` checkout, rather than only an unversioned archive.
 
-## What the executed tests do and do not establish
+The previous 261-test suite gained five real Git cases: clean committed source,
+linked worktree, root Git symlink, inherited Git environment, and user hooks /
+commit-signing / template settings. Existing recovery tests still require a
+real nonempty first commit and retain `upstream/.git`; no `--allow-empty` or
+blanket error suppression was added. See `GIT-TEST-ISOLATION.md`.
 
-Real Python allocations, local Unix notification sockets, harmless child processes,
-atomic filesystem transactions, Git, Make, C/ELF packaging fixtures, command-line
-parsing and failure injection were exercised. The build tests use explicitly
-labelled synthetic Cargo doubles/C binaries for pipeline scenarios. None of those
-passes is represented as compiling the actual Rust workspace or calibrating a disk.
-Memory-control tests use temporary files, not the host's real sysctls. Legacy swap
-restoration fixtures explicitly select an old policy; new production policy allows
-zero in-run growth. No real swapfile was activated by these tests.
+Both complete buildkit suites were additionally run with inherited `OFFLINE=1`.
+The four local-source fixture assumptions exposed by that environment are fixed
+without weakening the separate production/offline tests. The original failure
+log is retained as `ambient-offline-fixture-failure-reproduced.txt`.
 
-The original 2.4 Lab suite had 1,087 tests. Replacing its 75 adaptive-repair tests
-with 24 fail-closed tests, adding 26 memory-policy transaction tests and two final
-verdict/resume tests produces 1,064 current tests. The old adaptive expectations
-are deliberately not retained as current behavior. Historical source/tests/docs
-remain labelled under history/. The buildkit adds 23 exact-balloon Python tests
-to its original 238 software tests, producing 261.
+## Scope and limitations
 
-## Native/hardware boundary: NOT executed
+The tests exercise real Python, local files, Unix notification sockets, Git, Make,
+harmless subprocesses and signal delivery, including interrupted transactions.
+Kernel-control tests use temporary fake proc/sys trees; they do not change the
+delivery host's real memory controls. No real swap was activated. Build-pipeline
+fixtures use explicitly labelled synthetic Cargo/C executables; their passes do
+not count as compiling the real Rust workspace.
 
-The modified Rust workspace was not compiled. The real ordinary-user
-native-validate attempt verifies the complete patched source and then exits 2 at
-`Host rustc not found`, before compiling a crate. The attempt uses an explicit
-unsupported-Debian override only because this container is Debian 13 rather than
-the retained Forky build target. No automatic compiler installation or package
-change was performed. The separate installed-native test attempt ran zero tests:
-resctl-bench was not installed. These are recorded unavailable gates, not passes.
+The ordinary-user runs used uid 65534 and source extracted under umask 077.
+All production/test/fixture files compared to that tested copy are byte-identical;
+only documentation and validation evidence were added afterward. Detailed hashes
+are recorded in tested-source-comparison.json.
 
-The 34 selected Rust regressions (10 helper, 8 storage-resolution, 6 IO-policy,
-3 runtime-contract, 3 lifecycle and 4 balloon-identity tests) are mandatory in the
-real package gate on the build host; they have NOT run in this delivery container.
-No live systemd transient-unit lifecycle, BPF attachment, hardware coefficient/QoS
-tuning, reboot, real swap activation or measured-profile deployment was executed.
-No successful user-host outcome is claimed. A host-native compile failure remains
-possible until that gate is actually run; do not treat source inspection as proof.
+## Native and hardware gates: unavailable, NOT passed
 
-## Source and archive provenance
+The real `./BUILD.sh native-validate` attempt verified locked native source and
+then exited 2 at `Host rustc not found`. It was run as an ordinary user with the
+unsupported-Debian override solely to reach the availability check in this
+container; that is not a deployment recommendation. No Rust/compiler installation
+or package change was performed. `make check-installed` ran zero tests because
+the native executables were absent. Both actual failure logs are included.
 
-All production/test/fixture sources compared against the ordinary-user tested
-copies are byte-identical; the file counts are in tested-source-comparison*.json.
-Only documentation/evidence was added afterward. The full native workspace,
-real base Git object/history needed for version identity, aggregate reviewed patch,
-source lock/manifest, Cargo.lock and a hash-pinned local recovery archive are
-included. The working tree honestly remains dirty relative to the original base.
-The BPF collector, coefficient generator and IOCost stage sources are unchanged
-from the supplied ZIP; preserved-measurement-source*.json records their hashes.
+The previously patched native workspace still has NOT been compiled here.
+The real build-host gate must pass all 34 required native regressions and the
+package checks before installation. No live XanMod/le9uo control test, systemd
+transient-unit lifecycle, BPF attachment, physical-disk calibration, real OOM
+experiment, reboot or measured-profile deployment was performed.
 
-Old compiled archives, build caches, private toolchain paths and the user's support
-bundle are excluded. Third-party Cargo dependencies are locked but not vendored;
-normal cache/network access is needed for the first native build. `make source-dist`
-can vendor dependencies on the provisioned host. Checksums are regenerated for
-this delivery. Historical test logs are not current-result claims.
+## Source provenance
+
+All 163 native workspace files are byte-identical to the preceding delivery.
+The source lock, manifest, local recovery archive and Lab compiled-helper
+contract module are also unchanged. Existing successfully built and validated
+v3 executables remain compatible; this is not a claim that this environment
+compiled them. Native Git stat-cache metadata is excluded from source comparison
+and is normalized by the builder's source-snapshot packaging command.
+
+Both complete project source trees, tests, reviewed native patches, Cargo.lock
+and pinned source recovery are included. Third-party Cargo crates are locked
+but not vendored, so the first native build needs its normal cache/network and
+installed toolchain. No old binaries, private support bundle, build caches, or
+outer developer Git checkout are included. Older versioned validation folders
+are retained as explicitly historical records, not current-test claims.

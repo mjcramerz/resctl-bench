@@ -1,13 +1,13 @@
-# resctl-bench complete source release - build kit 2.4.0
+# resctl-bench complete source release - build kit 2.4.1
 
-**Current matched pair: IOCost Lab 2.5.0, build kit 2.4.0, native marker
+**Current matched pair: IOCost Lab 2.6.0, build kit 2.4.1, native marker
 resctl-iocost-lab-v3.** Read docs/FAILURE-ANALYSIS-2.4.0.md for the supplied
 OOM/restart/TransactionIsDestructive failure. This release moves balloon lifetime
 and exact allocation back into rd-agent, checks its identity during calibration,
 uses checked systemd stop/replace operations and propagates errors cleanly.
 The Lab no longer repairs memory conditions while continuing a measurement.
 
-**Validation:** 261 build-kit software tests passed; these include labelled
+**Validation:** current results are in docs/VALIDATION.md; these include labelled
 Cargo/C fixtures and do NOT establish Rust compilation. This delivery environment
 has no Rust compiler. The modified Rust workspace and its 34 mandatory native
 regressions are not executed here. No live disk/systemd/BPF calibration is claimed.
@@ -20,6 +20,20 @@ package version remains 2.2.6. The base commit is
 `bef3b59c01ec79f3601ae6cf43ed2e34ad8fc45b`; the intentional local patch is recorded
 in `patches/` and `source.lock.json` and the native version retains its honest
 `-dirty` suffix.
+
+## Git recovery regression fixed in 2.4.1
+
+`./BUILD.sh lint test` now runs from unpacked sources, an already committed Git
+checkout, or a linked worktree. The offline recovery fixture excludes only the
+outer `.git`; the locked `upstream/.git` remains required source metadata.
+The fixture's Git commands do not inherit unrelated `GIT_*` routing, user/system
+configuration, signing requirements, hooks or templates. The first commit remains
+a real non-empty commit; the failure is not hidden with `--allow-empty`.
+
+The exact old clean-checkout failure was reproduced, then tested with the repair.
+See docs/GIT-TEST-ISOLATION.md. All production native source, source lock, recovery
+asset and helper hashes remain unchanged. Native Rust compilation is still a
+separate required gate on the build host, not a result of these Python tests.
 
 ## Retained repair for the original PATH / host-requirement / panic failures
 
