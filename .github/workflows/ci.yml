@@ -59,7 +59,7 @@ jobs:
           tar -xzf dist/resctl-bench-buildkit-*-source-*.tar.gz -C "$scratch"
           cd "$scratch"/resctl-bench-buildkit-*-source-*
           make package verify OFFLINE=1 TOOLCHAIN=host TUNE=portable
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # retained supplied pin; not revalidated here
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # retained supplied pin; not revalidated here
         with:
           name: forky-release-and-source
           path: dist/*
